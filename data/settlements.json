@@ -1,0 +1,35 @@
+[
+  {
+    "id": "stl_7781",
+    "merchant_id": "m_2041",
+    "ticket_id": "T-1042",
+    "amount": 14280.0,
+    "status": "INITIATED",
+    "reason": "BANK_PENDING",
+    "utr": null,
+    "retry_count": 0,
+    "created_at": "2026-09-14T20:00:00Z"
+  },
+  {
+    "id": "stl_9902",
+    "merchant_id": "m_2099",
+    "ticket_id": "T-1055",
+    "amount": 184000.0,
+    "status": "FAILED",
+    "reason": "ACCOUNT_FROZEN_SUSPECT",
+    "utr": null,
+    "retry_count": 0,
+    "created_at": "2026-09-14T18:30:00Z"
+  },
+  {
+    "id": "stl_4011",
+    "merchant_id": "m_2048",
+    "ticket_id": null,
+    "amount": 8200.0,
+    "status": "SUCCESS",
+    "reason": "COMPLETED",
+    "utr": "PAYTM88102948201",
+    "retry_count": 0,
+    "created_at": "2026-09-14T10:00:00Z"
+  }
+]

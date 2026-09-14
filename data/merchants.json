@@ -1,0 +1,57 @@
+[
+  {
+    "id": "m_2041",
+    "name": "Sharma Kirana",
+    "city": "Karol Bagh",
+    "category": "Kirana",
+    "qr_status": "LIVE",
+    "soundbox_status": "ONLINE",
+    "avg_gmv": 18400.0,
+    "preferred_lang": "hi-en",
+    "risk_flag": null
+  },
+  {
+    "id": "m_2048",
+    "name": "Glow Salon",
+    "city": "Lajpat Nagar",
+    "category": "Salon",
+    "qr_status": "LIVE",
+    "soundbox_status": "ONLINE",
+    "avg_gmv": 12000.0,
+    "preferred_lang": "hi-en",
+    "risk_flag": null
+  },
+  {
+    "id": "m_2099",
+    "name": "Delhi Electronics",
+    "city": "Nehru Place",
+    "category": "Electronics",
+    "qr_status": "LIVE",
+    "soundbox_status": "ONLINE",
+    "avg_gmv": 95000.0,
+    "preferred_lang": "hi-en",
+    "risk_flag": "SUSPECT_ACCOUNT_FREEZE_AML"
+  },
+  {
+    "id": "m_2104",
+    "name": "Gupta Sweets",
+    "city": "Chandni Chowk",
+    "category": "Sweets & Snacks",
+    "qr_status": "LIVE",
+    "soundbox_status": "ONLINE",
+    "avg_gmv": 25000.0,
+    "preferred_lang": "hi-en",
+    "risk_flag": null
+  },
+  {
+    "id": "m_2115",
+    "name": "Aggarwal Supermart",
+    "city": "Rohini",
+    "category": "Supermarket",
+    "qr_status": "LIVE",
+    "soundbox_status": "ONLINE",
+    "avg_gmv": 42000.0,
+    "preferred_lang": "hi-en",
+    "risk_flag": null
+  }
+]

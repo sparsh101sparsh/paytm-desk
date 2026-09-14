@@ -1,0 +1,57 @@
+[
+  {
+    "id": "T-1042",
+    "merchant_id": "m_2041",
+    "text": "Kal se settlement nahi aaya. UTR bhi nahi dikh raha. 14,280 rs.",
+    "channel": "WhatsApp",
+    "status": "OPEN",
+    "amount": 14280.0,
+    "intent": "SETTLEMENT_MISSING",
+    "priority": "HIGH",
+    "created_at": "2026-09-15T01:30:00Z"
+  },
+  {
+    "id": "T-1048",
+    "merchant_id": "m_2048",
+    "text": "refund nahi aaya customer ka 850 rs",
+    "channel": "WhatsApp",
+    "status": "OPEN",
+    "amount": 850.0,
+    "intent": "REFUND_STATUS",
+    "priority": "MEDIUM",
+    "created_at": "2026-09-15T01:15:00Z"
+  },
+  {
+    "id": "T-1055",
+    "merchant_id": "m_2099",
+    "text": "Bhaiya 1,84,000 ka settlement fail ho gaya turant clear karo dukaan ka rent dena hai",
+    "channel": "WhatsApp",
+    "status": "OPEN",
+    "amount": 184000.0,
+    "intent": "SETTLEMENT_MISSING",
+    "priority": "HIGH",
+    "created_at": "2026-09-15T00:50:00Z"
+  },
+  {
+    "id": "T-1061",
+    "merchant_id": "m_2104",
+    "text": "Soundbox par payment receive hone par announcement nahi aa rahi.",
+    "channel": "WhatsApp",
+    "status": "OPEN",
+    "amount": null,
+    "intent": "DEVICE_ISSUE",
+    "priority": "LOW",
+    "created_at": "2026-09-15T00:10:00Z"
+  },
+  {
+    "id": "T-1067",
+    "merchant_id": "m_2115",
+    "text": "QR standee damage ho gaya, shop ke liye naya standee bhejo.",
+    "channel": "WhatsApp",
+    "status": "OPEN",
+    "amount": null,
+    "intent": "QR_DOWN",
+    "priority": "LOW",
+    "created_at": "2026-09-14T23:45:00Z"
+  }
+]

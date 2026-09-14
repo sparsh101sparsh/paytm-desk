@@ -1,0 +1,186 @@
+{
+  "name": "DESK - Merchant Ticket Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "desk-run",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "Webhook: Run DESK",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [180, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://localhost:8000/api/tickets/{{ $json.body.ticket_id }}",
+        "method": "GET",
+        "options": {}
+      },
+      "id": "node-load-ticket",
+      "name": "HTTP: Load Ticket & Merchant",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.sarvam.ai/v1/chat/completions",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api-subscription-key",
+              "value": "={{ $env.SARVAM_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "sarvam-105b"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-sarvam-planner",
+      "name": "HTTP: Sarvam 105b Planner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [620, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://localhost:8000/api/tickets/{{ $('node-webhook').item.json.body.ticket_id }}/run",
+        "method": "POST",
+        "options": {}
+      },
+      "id": "node-policy-tools",
+      "name": "HTTP: Policy Decide & Execute Tools",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [840, 300]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.reason_code }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "SETTLEMENT_RETRY_OK",
+              "output": 0
+            },
+            {
+              "value2": "ASK_MERCHANT_UTR",
+              "output": 1
+            },
+            {
+              "value2": "ESCALATE_RISK",
+              "output": 2
+            }
+          ]
+        }
+      },
+      "id": "node-switch-outcome",
+      "name": "Switch: Allow / Ask / Escalate",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [1060, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "node-response",
+      "name": "Respond to DESK UI",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1280, 300]
+    }
+  ],
+  "connections": {
+    "Webhook: Run DESK": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Load Ticket & Merchant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Load Ticket & Merchant": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Sarvam 105b Planner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Sarvam 105b Planner": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Policy Decide & Execute Tools",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Policy Decide & Execute Tools": {
+      "main": [
+        [
+          {
+            "node": "Switch: Allow / Ask / Escalate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: Allow / Ask / Escalate": {
+      "main": [
+        [
+          {
+            "node": "Respond to DESK UI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to DESK UI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to DESK UI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

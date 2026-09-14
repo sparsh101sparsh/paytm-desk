@@ -1,0 +1,14 @@
+# Dependencies & Virtual Environments
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# Build outputs & caches
+.next/
+.pytest_cache/
+*.log
+
+# Database
+# Note: Keep desk.db untracked or tracked if preferred, but seed creates it dynamically
+*.db-journal
