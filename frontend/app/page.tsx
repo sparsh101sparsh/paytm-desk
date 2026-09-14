@@ -71,12 +71,18 @@ interface TicketDetail {
   memory_chips: Array<{ type: string; label: string; severity: string }>;
 }
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL !== undefined
-    ? process.env.NEXT_PUBLIC_API_URL
-    : typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
-    ? ""
-    : "http://localhost:8000";
+function getApiUrl(endpoint: string): string {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return `${process.env.NEXT_PUBLIC_API_URL}${endpoint}`;
+  }
+  if (typeof window !== "undefined") {
+    if ((window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && window.location.port === "3000") {
+      return `http://${window.location.hostname}:8000${endpoint}`;
+    }
+    return endpoint;
+  }
+  return endpoint;
+}
 
 export default function DeskBoard() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -92,7 +98,7 @@ export default function DeskBoard() {
   // Load tickets
   const loadTickets = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/tickets`);
+      const res = await fetch(getApiUrl("/api/tickets"));
       if (res.ok) {
         const data = await res.json();
         setTickets(data);
@@ -106,8 +112,8 @@ export default function DeskBoard() {
   const loadTicketDetail = async (id: string) => {
     try {
       const [detailRes, eventsRes] = await Promise.all([
-        fetch(`${API_BASE}/api/tickets/${id}`),
-        fetch(`${API_BASE}/api/tickets/${id}/events`)
+        fetch(getApiUrl(`/api/tickets/${id}`)),
+        fetch(getApiUrl(`/api/tickets/${id}/events`))
       ]);
       if (detailRes.ok) {
         const detail = await detailRes.json();
@@ -137,7 +143,7 @@ export default function DeskBoard() {
     if (!selectedId || isRunning) return;
     setIsRunning(true);
     try {
-      const res = await fetch(`${API_BASE}/api/tickets/${selectedId}/run`, {
+      const res = await fetch(getApiUrl(`/api/tickets/${selectedId}/run`), {
         method: "POST"
       });
       if (res.ok) {
@@ -154,7 +160,7 @@ export default function DeskBoard() {
   // Reset Demo
   const handleResetDemo = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/demo/reset`, { method: "POST" });
+      const res = await fetch(getApiUrl("/api/demo/reset"), { method: "POST" });
       if (res.ok) {
         await loadTickets();
         if (selectedId) {
@@ -398,17 +404,19 @@ export default function DeskBoard() {
 
                 <button
                   onClick={handleRunDesk}
-                  disabled={isRunning || currentTicket?.status === "RESOLVED" || currentTicket?.status === "WAITING_ON_MERCHANT" || currentTicket?.status === "ESCALATED"}
-                  className={`px-5 py-2 rounded-lg text-xs font-semibold shadow-paytm transition flex items-center gap-2 ${
+                  disabled={isRunning}
+                  className={`px-5 py-2 rounded-lg text-xs font-semibold shadow-paytm transition flex items-center gap-2 cursor-pointer active:scale-95 ${
                     isRunning
                       ? "bg-[#00BAF2]/70 text-white cursor-not-allowed"
-                      : currentTicket?.status === "RESOLVED" || currentTicket?.status === "WAITING_ON_MERCHANT" || currentTicket?.status === "ESCALATED"
-                      ? "bg-gray-200 text-gray-500 cursor-not-allowed"
                       : "bg-[#00BAF2] hover:bg-[#00A8DC] text-white"
                   }`}
                 >
                   <Play className={`w-3.5 h-3.5 ${isRunning ? "animate-spin" : "fill-white"}`} />
-                  {isRunning ? "Running DESK..." : "Run DESK"}
+                  {isRunning
+                    ? "Running DESK..."
+                    : currentTicket?.status === "RESOLVED" || currentTicket?.status === "WAITING_ON_MERCHANT" || currentTicket?.status === "ESCALATED"
+                    ? "Re-run DESK"
+                    : "Run DESK"}
                 </button>
               </div>
             </div>
