@@ -32,3 +32,27 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #9CA3AF;
 }
+
+/* DESK-UI-SPEC.md: Timeline cards — fade + 8px rise */
+@keyframes card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-card-rise {
+  animation: card-rise 0.28s ease-out both;
+}
+
+/* Stagger delays for sequential card appearance (~400ms apart) */
+.stagger-0 { animation-delay: 0ms; }
+.stagger-1 { animation-delay: 400ms; }
+.stagger-2 { animation-delay: 800ms; }
+.stagger-3 { animation-delay: 1200ms; }
+.stagger-4 { animation-delay: 1600ms; }
+

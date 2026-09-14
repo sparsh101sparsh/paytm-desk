@@ -76,6 +76,16 @@ def init_db(conn=None):
         FOREIGN KEY (merchant_id) REFERENCES merchants(id)
     );
 
+    CREATE TABLE IF NOT EXISTS refunds (
+        id TEXT PRIMARY KEY,
+        ticket_id TEXT NOT NULL,
+        transaction_id TEXT,
+        amount REAL NOT NULL,
+        status TEXT NOT NULL, -- PENDING, PROCESSED, REJECTED
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (ticket_id) REFERENCES tickets(id)
+    );
+
     CREATE TABLE IF NOT EXISTS devices (
         id TEXT PRIMARY KEY,
         merchant_id TEXT NOT NULL,

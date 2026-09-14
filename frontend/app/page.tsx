@@ -457,7 +457,7 @@ export default function DeskBoard() {
 
               {/* CARD 1: SARVAM (Understood) */}
               {sarvamEvent && (
-                <div className="bg-white border border-[#E6EAF0] rounded-xl p-4 shadow-paytm transition-all duration-300">
+                <div className="bg-white border border-[#E6EAF0] rounded-xl p-4 shadow-paytm animate-card-rise stagger-0">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 bg-[#002970] text-white text-[10px] font-black tracking-wider rounded">
@@ -486,7 +486,7 @@ export default function DeskBoard() {
 
               {/* CARD 2: COGNEE (Remembered) */}
               {cogneeEvent && (
-                <div className="bg-white border border-[#E6EAF0] rounded-xl p-4 shadow-paytm transition-all duration-300">
+                <div className="bg-white border border-[#E6EAF0] rounded-xl p-4 shadow-paytm animate-card-rise stagger-1">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 bg-[#00BAF2] text-white text-[10px] font-black tracking-wider rounded">
@@ -533,7 +533,7 @@ export default function DeskBoard() {
 
               {/* CARD 3: POLICY (Decided) */}
               {policyEvent && (
-                <div className="bg-white border border-[#E6EAF0] rounded-xl p-4 shadow-paytm transition-all duration-300">
+                <div className="bg-white border border-[#E6EAF0] rounded-xl p-4 shadow-paytm animate-card-rise stagger-2">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 bg-[#1B1F3B] text-white text-[10px] font-black tracking-wider rounded">
@@ -568,7 +568,7 @@ export default function DeskBoard() {
 
               {/* CARD 4: N8N (Acted) */}
               {actedEvents.length > 0 && (
-                <div className="bg-white border border-[#E6EAF0] rounded-xl p-4 shadow-paytm transition-all duration-300">
+                <div className="bg-white border border-[#E6EAF0] rounded-xl p-4 shadow-paytm animate-card-rise stagger-3">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 bg-[#FF6D5A] text-white text-[10px] font-black tracking-wider rounded">
@@ -604,7 +604,7 @@ export default function DeskBoard() {
 
               {/* CARD 5: WHATSAPP OUTBOX PREVIEW */}
               {ticketDetail?.latest_whatsapp && (
-                <div className="bg-white border border-[#E6EAF0] rounded-xl p-4 shadow-paytm">
+                <div className="bg-white border border-[#E6EAF0] rounded-xl p-4 shadow-paytm animate-card-rise stagger-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-1.5 text-xs font-bold text-[#14804A]">
                       <MessageSquare className="w-3.5 h-3.5 text-[#14804A]" />

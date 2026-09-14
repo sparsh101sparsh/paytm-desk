@@ -36,11 +36,14 @@ app.add_middleware(
 
 @app.get("/health")
 def health():
+    import os
+    cognee_optional = os.getenv("COGNEE_OPTIONAL", "0") == "1"
+    cognee_status = "simulation (COGNEE_OPTIONAL=1)" if cognee_optional else "down"
     return {
         "status": "healthy",
         "database": "sqlite:ok",
         "sarvam": "live" if SARVAM_API_KEY else "fixture",
-        "cognee": "ok",
+        "cognee": cognee_status,
         "n8n": "ready"
     }
 

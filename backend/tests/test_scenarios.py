@@ -72,7 +72,12 @@ def test_scenario_t1048_ask_merchant_utr():
     assert msg["template_id"] == "ask_utr"
     assert "UTR" in msg["body"]
 
+    # BUILD-PROMPT.md line 157: T-1048 refunds table must be empty (no refund processed)
+    cur.execute("SELECT count(*) as cnt FROM refunds WHERE ticket_id = 'T-1048'")
+    assert cur.fetchone()["cnt"] == 0
+
     conn.close()
+
 
 def test_scenario_t1055_escalate_risk():
     # 1. Run T-1055

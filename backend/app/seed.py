@@ -21,6 +21,7 @@ def seed_database():
         "whatsapp_messages",
         "human_briefs",
         "cognee_sync_log",
+        "refunds",
         "transactions",
         "settlements",
         "devices",
