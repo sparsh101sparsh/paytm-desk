@@ -12,3 +12,4 @@ __pycache__/
 # Database
 # Note: Keep desk.db untracked or tracked if preferred, but seed creates it dynamically
 *.db-journal
+.vercel

@@ -38,6 +38,7 @@ app.add_middleware(
 )
 
 @app.get("/health")
+@app.get("/api/health")
 def health():
     import os
     cognee_optional = os.getenv("COGNEE_OPTIONAL", "0") == "1"
@@ -51,9 +52,11 @@ def health():
     }
 
 @app.post("/demo/reset")
+@app.post("/api/demo/reset")
 def reset_demo():
     seed_database()
     return {"status": "ok", "message": "Demo reset to initial seed."}
+
 
 @app.get("/api/tickets")
 def get_tickets():
