@@ -6,9 +6,10 @@ Paytm Intelligence teammate for merchant support.
 import os
 import json
 import uuid
-from typing import List, Optional
-from fastapi import FastAPI, HTTPException
+from typing import List, Optional, Dict, Any
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+import httpx
 
 from .db import get_db, now_iso
 from .seed import seed_database
@@ -23,6 +24,8 @@ from .tools import (
     execute_update_ticket,
     execute_assign_human
 )
+
+N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "")
 
 app = FastAPI(title="DESK - Paytm Merchant Support Teammate", version="1.0.0")
 
@@ -128,16 +131,32 @@ def get_ticket_events(ticket_id: str):
     return events
 
 @app.post("/api/tickets/{ticket_id}/run", response_model=RunResponse)
-def run_desk(ticket_id: str):
+def run_desk(ticket_id: str, request: Request = None):
     """
     Runs the full DESK lifecycle:
-    1. Load DB state
+    1. Check N8N_WEBHOOK_URL if external orchestrator is active
     2. Sarvam / Fixture planner (Intent & Plan proposal) -> Audit: UNDERSTOOD
     3. Cognee memory search -> Audit: RECALLED
     4. Deterministic Policy decision -> Audit: DECIDED
     5. n8n execution of allowed tools -> Audit: ACTED / NOTIFIED
     6. Cognee outcome remember
     """
+    # If N8N_WEBHOOK_URL is set and request didn't come from n8n itself, attempt webhook trigger
+    if N8N_WEBHOOK_URL and request and request.headers.get("x-n8n-trigger") != "true":
+        try:
+            with httpx.Client(timeout=8.0) as client:
+                res = client.post(
+                    N8N_WEBHOOK_URL,
+                    json={"ticket_id": ticket_id},
+                    headers={"x-trigger-source": "desk-ui"}
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    if isinstance(data, dict) and data.get("n8n_execution_id"):
+                        return RunResponse(**data)
+        except Exception:
+            pass  # Fall back to in-process pipeline
+
     conn = get_db()
     cur = conn.cursor()
 
@@ -270,3 +289,41 @@ def run_desk(ticket_id: str):
         n8n_execution_id=n8n_exec_id,
         events_count=events_count
     )
+
+@app.post("/api/policy/decide", response_model=PolicyDecision)
+def decide_policy(body: Dict[str, Any]):
+    """
+    Direct endpoint for n8n to call in-process policy evaluation.
+    """
+    plan = SarvamPlan(**body.get("plan", {}))
+    db_state = body.get("db_state", {})
+    return evaluate_policy(plan, db_state)
+
+@app.post("/api/tools/{tool_name}")
+def execute_tool(tool_name: str, body: Dict[str, Any]):
+    """
+    Direct endpoint for n8n to execute verified tools with policy tokens.
+    """
+    ticket_id = body.get("ticket_id", "")
+    policy_token = body.get("policy_token", "")
+
+    if tool_name == "retry_settlement_file":
+        batch_id = body.get("batch_id") or body.get("args", {}).get("batch_id")
+        return execute_retry_settlement_file(ticket_id, batch_id, policy_token)
+
+    elif tool_name == "send_whatsapp":
+        template_id = body.get("template_id") or body.get("args", {}).get("template_id", "settlement_retry_sent")
+        variables = body.get("variables") or body.get("args", {}).get("variables", {})
+        return execute_send_whatsapp(ticket_id, template_id, variables)
+
+    elif tool_name == "update_ticket":
+        status = body.get("status") or body.get("args", {}).get("status", "RESOLVED")
+        return execute_update_ticket(ticket_id, status, policy_token)
+
+    elif tool_name == "assign_human":
+        queue = body.get("queue") or body.get("args", {}).get("queue", "RISK_OPS")
+        brief_dict = body.get("brief_dict") or body.get("args", {}).get("brief_dict", {})
+        return execute_assign_human(ticket_id, queue, brief_dict, policy_token)
+
+    raise HTTPException(status_code=400, detail=f"Unknown tool: {tool_name}")
+
