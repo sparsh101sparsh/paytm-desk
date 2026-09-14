@@ -15,7 +15,7 @@ SARVAM_MODEL = os.getenv("SARVAM_MODEL", "sarvam-105b")
 SARVAM_ENDPOINT = "https://api.sarvam.ai/v1/chat/completions"
 
 SYSTEM_PROMPT = """You are DESK, an autonomous Paytm Merchant Support operations teammate.
-Analyze the merchant ticket and context. Return ONLY a valid JSON object with the following structure:
+Think briefly. Analyze the merchant ticket and context. Return ONLY a valid JSON object with the following structure:
 {
   "intent": "SETTLEMENT_MISSING | PAYMENT_NOT_RECEIVED | REFUND_STATUS | QR_DOWN | DEVICE_ISSUE | UNKNOWN",
   "confidence": 0.95,
@@ -45,18 +45,19 @@ def generate_plan(db_state: Dict[str, Any]) -> Tuple[SarvamPlan, str, int]:
     merchant_name = merchant.get("name", "")
     merchant_id = merchant.get("id", "")
 
-    if SARVAM_API_KEY:
+    api_key = os.getenv("SARVAM_API_KEY", "") or SARVAM_API_KEY
+    if api_key:
         user_message = f"""Merchant: {merchant_name} (ID: {merchant_id})
 Ticket: {ticket_text}
 Current Settlements in DB: {json.dumps(settlements)}
 Current Transactions in DB: {json.dumps(transactions)}
 """
         try:
-            with httpx.Client(timeout=15.0) as client:
+            with httpx.Client(timeout=30.0) as client:
                 res = client.post(
                     SARVAM_ENDPOINT,
                     headers={
-                        "api-subscription-key": SARVAM_API_KEY,
+                        "api-subscription-key": api_key,
                         "Content-Type": "application/json"
                     },
                     json={
@@ -65,17 +66,27 @@ Current Transactions in DB: {json.dumps(transactions)}
                             {"role": "system", "content": SYSTEM_PROMPT},
                             {"role": "user", "content": user_message}
                         ],
-                        "temperature": 0.2
+                        "temperature": 0.1,
+                        "max_tokens": 4096
                     }
                 )
                 if res.status_code == 200:
                     data = res.json()
-                    content = data["choices"][0]["message"]["content"]
-                    parsed = json.loads(content)
+                    msg = data["choices"][0]["message"]
+                    raw_text = msg.get("content") or msg.get("reasoning_content") or ""
+                    raw_text = raw_text.strip()
+                    start = raw_text.find("{")
+                    end = raw_text.rfind("}")
+                    if start != -1 and end != -1:
+                        raw_text = raw_text[start:end+1]
+                    parsed = json.loads(raw_text)
                     return SarvamPlan(**parsed), "SARVAM", int(res.elapsed.total_seconds() * 1000)
-        except Exception:
-            # Fall back to fixture if external call fails
-            pass
+                else:
+                    print(f"Sarvam returned non-200: {res.status_code} {res.text}")
+        except Exception as e:
+            print(f"Sarvam call exception: {e}")
+
+
 
     # Deterministic DB-state fixture planner (never inspects ticket id!)
     # Inspects DB state: text keywords, settlement status, transaction count
