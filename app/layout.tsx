@@ -5,7 +5,14 @@ export const metadata: Metadata = {
   title: "Paytm for Business · DESK",
   description: "Autonomous AI Teammate for Paytm Merchant Support",
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
 };
 

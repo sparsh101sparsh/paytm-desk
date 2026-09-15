@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#001C4F" />
+      <stop offset="100%" stop-color="#002970" />
+    </linearGradient>
+    <linearGradient id="cyanGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00E0FF" />
+      <stop offset="100%" stop-color="#00BAF2" />
+    </linearGradient>
+  </defs>
+
+  <!-- Squircle Base -->
+  <rect width="512" height="512" rx="115" fill="url(#bg)" />
+  <rect x="16" y="16" width="480" height="480" rx="100" fill="none" stroke="#00BAF2" stroke-width="6" stroke-opacity="0.2" />
+
+  <!-- Paytm 'p' Stem (Cyan) -->
+  <rect x="128" y="128" width="68" height="256" rx="34" fill="url(#cyanGlow)" />
+
+  <!-- Paytm 'p' Bowl / Loop (White) -->
+  <path d="M 196 128 L 290 128 C 360 128 406 172 406 238 C 406 304 360 348 290 348 L 196 348 Z" fill="#FFFFFF" />
+
+  <!-- Paytm 'p' Bowl Cutout (Navy) -->
+  <path d="M 196 196 L 284 196 C 322 196 344 214 344 238 C 344 262 322 280 284 280 L 196 280 Z" fill="#002970" />
+
+  <!-- AI Sparkle (DESK Intelligence) in Top Right -->
+  <path d="M 420 80 Q 420 115 455 115 Q 420 115 420 150 Q 420 115 385 115 Q 420 115 420 80 Z" fill="url(#cyanGlow)" />
+  <circle cx="420" cy="115" r="6" fill="#FFFFFF" />
+</svg>
