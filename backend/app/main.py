@@ -103,11 +103,12 @@ def get_ticket_detail(ticket_id: str):
 
     conn.close()
 
+    ticket_dict = dict(ticket)
     # Cognee memory chips
-    memory_chips = search_memory(ticket["merchant_id"], ticket.get("intent") or "")
+    memory_chips = search_memory(ticket["merchant_id"], ticket_dict.get("intent") or "")
 
     return {
-        "ticket": dict(ticket),
+        "ticket": ticket_dict,
         "merchant": dict(merchant) if merchant else None,
         "settlements": settlements,
         "transactions": transactions,
