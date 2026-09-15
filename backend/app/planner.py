@@ -1,5 +1,5 @@
 """
-Sarvam planner client for DESK.
+Sarvam planner client for ResolveOS.
 Calls Sarvam 105b for Hinglish understanding and structured plan proposal.
 Falls back to deterministic DB-state fixture planner only if SARVAM_API_KEY is missing.
 Logs raw prompt/response and actor in audit_events.
@@ -14,7 +14,7 @@ SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "")
 SARVAM_MODEL = os.getenv("SARVAM_MODEL", "sarvam-105b")
 SARVAM_ENDPOINT = "https://api.sarvam.ai/v1/chat/completions"
 
-SYSTEM_PROMPT = """You are DESK, an autonomous Paytm Merchant Support operations teammate.
+SYSTEM_PROMPT = """You are ResolveOS, an autonomous Paytm Merchant Support operations teammate.
 Think briefly. Analyze the merchant ticket and context. Return ONLY a valid JSON object with the following structure:
 {
   "intent": "SETTLEMENT_MISSING | PAYMENT_NOT_RECEIVED | REFUND_STATUS | QR_DOWN | DEVICE_ISSUE | UNKNOWN",

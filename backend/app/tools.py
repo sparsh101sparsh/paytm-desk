@@ -1,5 +1,5 @@
 """
-Tool executor for DESK.
+Tool executor for ResolveOS.
 All write tools verify PolicyToken and mutate SQLite database directly.
 No fake timeline. Every action is persisted to DB and logged to audit_events.
 """
@@ -10,15 +10,15 @@ from .db import get_db, now_iso
 
 WHATSAPP_TEMPLATES = {
     "settlement_retry_sent": (
-        "Namaste Sharma ji, Paytm DESK here. Aapka settlement batch {batch_id} "
+        "Namaste Sharma ji, Paytm ResolveOS here. Aapka settlement batch {batch_id} "
         "bank file mein atka tha. Humne dubara push kar diya hai. 2 ghante mein check karein. Ticket {ticket_id}."
     ),
     "ask_utr": (
-        "Namaste {merchant_name}, Paytm DESK here. Aapke 3 transactions mile hain. "
+        "Namaste {merchant_name}, Paytm ResolveOS here. Aapke 3 transactions mile hain. "
         "Kripya customer ka 12-digit UTR ya exact time share karein taaki refund process ho sake. Ticket {ticket_id}."
     ),
     "escalated_risk": (
-        "Namaste {merchant_name}, Paytm DESK here. Aapka case verification ke liye "
+        "Namaste {merchant_name}, Paytm ResolveOS here. Aapka case verification ke liye "
         "Risk Ops desk ko transfer kiya gaya hai. Ticket {ticket_id}."
     )
 }
@@ -57,7 +57,7 @@ def execute_send_whatsapp(ticket_id: str, template_id: str, variables: dict) -> 
     conn = get_db()
     cur = conn.cursor()
 
-    template_str = WHATSAPP_TEMPLATES.get(template_id, "Namaste from Paytm DESK. Ticket {ticket_id}.")
+    template_str = WHATSAPP_TEMPLATES.get(template_id, "Namaste from Paytm ResolveOS. Ticket {ticket_id}.")
     body = template_str.format(**variables)
 
     cur.execute("""

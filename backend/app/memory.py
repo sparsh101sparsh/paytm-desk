@@ -1,5 +1,5 @@
 """
-Cognee Merchant Memory client for DESK.
+Cognee Merchant Memory client for ResolveOS.
 Manages merchant history, past settlements, SOP knowledge graph, and recall chips.
 Logs all searches and memory additions to cognee_sync_log table.
 """

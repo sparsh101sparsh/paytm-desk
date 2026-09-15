@@ -1,4 +1,4 @@
-# DESK — Paytm Intelligence Teammate for Merchant Support
+# ResolveOS — Paytm Intelligence Teammate for Merchant Support
 
 > **Track:** Autonomous AI Teammates  
 > **Event:** Paytm ♥ AI Hackathon · Delhi · 19 September 2026  
@@ -6,8 +6,8 @@
 
 ---
 
-## What is DESK?
-DESK is an autonomous AI operations teammate built inside the **Paytm for Business** ecosystem. It resolves Hinglish merchant disputes over settlements and refunds end-to-end:
+## What is ResolveOS?
+ResolveOS is an autonomous AI operations teammate built inside the **Paytm for Business** ecosystem. It resolves Hinglish merchant disputes over settlements and refunds end-to-end:
 - **Sarvam (`sarvam-105b`)**: Comprehends Hinglish merchant tickets and proposes structured action plans.
 - **Cognee**: Recalls merchant history, settlement status, and operational SOPs from a knowledge graph.
 - **Deterministic Policy**: Non-LLM rule engine strictly enforcing financial risk limits (e.g. max ₹50k retry limit, AML freeze checks).
@@ -26,7 +26,7 @@ DESK is an autonomous AI operations teammate built inside the **Paytm for Busine
 | **T-1055** | Delhi Electronics (Nehru Place) | Settlement ₹1,84,000 failed + `ACCOUNT_FROZEN_SUSPECT` | `ESCALATE_RISK` | Zero retries attempted, Ticket `ESCALATED`, 6-line brief dispatched to `RISK_OPS`. |
 
 **Anti-Cheat / Anti-Hardcoding Verification:**
-If you edit the settlement amount in SQLite for T-1042 to ₹60,000, DESK immediately denies the auto-retry with `SETTLEMENT_RETRY_DENIED_AMOUNT` and escalates. There are zero `if (ticketId === "T-1042")` statements anywhere in the codebase.
+If you edit the settlement amount in SQLite for T-1042 to ₹60,000, ResolveOS immediately denies the auto-retry with `SETTLEMENT_RETRY_DENIED_AMOUNT` and escalates. There are zero `if (ticketId === "T-1042")` statements anywhere in the codebase.
 
 ---
 

@@ -2,7 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Paytm for Business · DESK",
+  title: "Paytm for Business · ResolveOS",
   description: "Autonomous AI Teammate for Paytm Merchant Support",
   icons: {
     icon: [
