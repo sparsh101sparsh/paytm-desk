@@ -290,19 +290,12 @@ export default function ResolveOS() {
       const container = tabsContainerRef.current;
 
       if (targetElement && container) {
-        const isDirect = targetElement.offsetParent === container;
-        const left = isDirect
-          ? targetElement.offsetLeft
-          : targetElement.getBoundingClientRect().left - container.getBoundingClientRect().left;
-        const top = isDirect
-          ? targetElement.offsetTop
-          : targetElement.getBoundingClientRect().top - container.getBoundingClientRect().top;
-        const width = isDirect
-          ? targetElement.offsetWidth
-          : targetElement.getBoundingClientRect().width;
-        const height = isDirect
-          ? targetElement.offsetHeight
-          : targetElement.getBoundingClientRect().height;
+        const targetRect = targetElement.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const left = targetRect.left - containerRect.left;
+        const top = targetRect.top - containerRect.top;
+        const width = targetRect.width;
+        const height = targetRect.height;
 
         setTabPillStyle({ left, top, width, height });
       }
@@ -316,27 +309,17 @@ export default function ResolveOS() {
   // Reposition Header Action Gliding Pill
   useLayoutEffect(() => {
     const updateHeaderPosition = () => {
-      if (!hoveredHeaderBtn) {
-        setHeaderPillStyle(null);
-        return;
-      }
+      if (!hoveredHeaderBtn) return;
       const targetElement = headerBtnRefs.current[hoveredHeaderBtn];
       const container = headerContainerRef.current;
 
       if (targetElement && container) {
-        const isDirect = targetElement.offsetParent === container;
-        const left = isDirect
-          ? targetElement.offsetLeft
-          : targetElement.getBoundingClientRect().left - container.getBoundingClientRect().left;
-        const top = isDirect
-          ? targetElement.offsetTop
-          : targetElement.getBoundingClientRect().top - container.getBoundingClientRect().top;
-        const width = isDirect
-          ? targetElement.offsetWidth
-          : targetElement.getBoundingClientRect().width;
-        const height = isDirect
-          ? targetElement.offsetHeight
-          : targetElement.getBoundingClientRect().height;
+        const targetRect = targetElement.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const left = targetRect.left - containerRect.left;
+        const top = targetRect.top - containerRect.top;
+        const width = targetRect.width;
+        const height = targetRect.height;
 
         setHeaderPillStyle({ left, top, width, height });
       }
@@ -684,12 +667,12 @@ export default function ResolveOS() {
           <div
             ref={headerContainerRef}
             onMouseLeave={() => setHoveredHeaderBtn(null)}
-            className="relative flex items-center gap-1 p-0.5 rounded-lg bg-black/15"
+            className="relative flex items-center p-0.5 rounded-md bg-white/10 border border-white/20 overflow-hidden shadow-sm"
           >
-            {/* Sliding Pill Indicator for Header Controls */}
+            {/* Sliding Pill Indicator for Header Controls with Crisp Squaring & Clean Border */}
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute z-0 rounded-md bg-white/20 transition-all"
+              className="pointer-events-none absolute z-0 rounded-[4px] bg-white/20 border border-white/25 shadow-sm transition-all"
               style={{
                 left: headerPillStyle?.left ?? 0,
                 top: headerPillStyle?.top ?? 0,
@@ -697,7 +680,7 @@ export default function ResolveOS() {
                 height: headerPillStyle?.height ?? 0,
                 opacity: headerPillStyle && hoveredHeaderBtn ? 1 : 0,
                 transition:
-                  "left 240ms cubic-bezier(0.23, 1, 0.32, 1), top 240ms cubic-bezier(0.23, 1, 0.32, 1), width 240ms cubic-bezier(0.23, 1, 0.32, 1), height 240ms cubic-bezier(0.23, 1, 0.32, 1), opacity 150ms ease",
+                  "left 200ms cubic-bezier(0.23, 1, 0.32, 1), width 200ms cubic-bezier(0.23, 1, 0.32, 1), opacity 150ms ease",
               }}
             />
 
@@ -705,7 +688,7 @@ export default function ResolveOS() {
               ref={(el) => { headerBtnRefs.current["reset"] = el; }}
               onMouseEnter={() => setHoveredHeaderBtn("reset")}
               onClick={handleReset}
-              className="relative z-10 flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-white/90 hover:text-white rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00BAF2]"
+              className="relative z-10 h-7 px-2.5 flex items-center gap-1.5 text-xs font-medium text-white/90 hover:text-white rounded-[4px] transition-colors focus-visible:outline-none"
               title="Clear tickets and reset test ledger"
             >
               <RotateCcw className="w-3 h-3 text-[#00BAF2]" />
@@ -716,27 +699,27 @@ export default function ResolveOS() {
               ref={(el) => { headerBtnRefs.current["arch"] = el; }}
               onMouseEnter={() => setHoveredHeaderBtn("arch")}
               onClick={() => setShowArchPopover(!showArchPopover)}
-              className="relative z-10 w-7 h-6 flex items-center justify-center text-white/80 hover:text-white rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00BAF2]"
+              className="relative z-10 h-7 w-7 flex items-center justify-center text-white/80 hover:text-white rounded-[4px] transition-colors focus-visible:outline-none"
               title="Architecture Flowchart"
             >
               <HelpCircle className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="h-3 w-px bg-white/20" />
+          <div className="h-4 w-px bg-white/20 shrink-0" />
 
-          {/* Health dots */}
-          <div className="flex items-center gap-2 text-[11px] text-white/70 font-normal">
-            <div className="flex items-center gap-1" title="SQLite Database">
-              <span className={`w-1.5 h-1.5 rounded-full ${apiError ? "bg-red-500" : "bg-emerald-400"}`} />
+          {/* Health status badges with crisp squaring & borders */}
+          <div className="flex items-center gap-2 text-[11px] text-white/80 font-normal">
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/10 border border-white/15 shadow-sm" title="SQLite Database">
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${apiError ? "bg-red-400" : "bg-emerald-400"}`} />
               <span className="hidden sm:inline">API</span>
             </div>
-            <div className="flex items-center gap-1" title={health?.sarvam === "live" ? "Sarvam 105B Live" : "Sarvam Fixture"}>
-              <span className={`w-1.5 h-1.5 rounded-full ${health?.sarvam === "live" ? "bg-emerald-400" : "bg-amber-400"}`} />
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/10 border border-white/15 shadow-sm" title={health?.sarvam === "live" ? "Sarvam 105B Live" : "Sarvam Fixture"}>
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${health?.sarvam === "live" ? "bg-emerald-400" : "bg-amber-400"}`} />
               <span className="hidden sm:inline">Sarvam</span>
             </div>
-            <div className="flex items-center gap-1" title="Meta WhatsApp Cloud API">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/10 border border-white/15 shadow-sm" title="Meta WhatsApp Cloud API">
+              <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-emerald-400" />
               <span className="hidden sm:inline">WhatsApp</span>
             </div>
           </div>
@@ -931,57 +914,59 @@ export default function ResolveOS() {
             </span>
           </div>
 
-          {/* NETRA-Inspired Gliding Filter Tabs */}
-          <div
-            ref={tabsContainerRef}
-            onMouseLeave={() => setHoveredTab(null)}
-            className="relative flex items-center p-1 bg-slate-100/90 border-b border-[#E5E7EB] text-xs font-medium select-none"
-            aria-label="Queue Filter Tabs"
-          >
-            {/* The Gliding Indicator Pill with Beautiful-UI bezier curve */}
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute z-0 rounded-md bg-[#002970] shadow-sm transition-all"
-              style={{
-                left: tabPillStyle?.left ?? 0,
-                top: tabPillStyle?.top ?? 0,
-                width: tabPillStyle?.width ?? 0,
-                height: tabPillStyle?.height ?? 0,
-                opacity: tabPillStyle ? 1 : 0,
-                transition:
-                  "left 240ms cubic-bezier(0.23, 1, 0.32, 1), top 240ms cubic-bezier(0.23, 1, 0.32, 1), width 240ms cubic-bezier(0.23, 1, 0.32, 1), height 240ms cubic-bezier(0.23, 1, 0.32, 1), opacity 150ms ease",
-              }}
-            />
+          {/* Gliding Filter Tabs with Crisp Squaring & Proper Border */}
+          <div className="p-2 border-b border-[#E5E7EB] bg-slate-50/70 shrink-0">
+            <div
+              ref={tabsContainerRef}
+              onMouseLeave={() => setHoveredTab(null)}
+              className="relative flex items-center p-0.5 rounded-md bg-slate-200/70 border border-slate-300/80 text-xs font-medium select-none overflow-hidden shadow-inner"
+              aria-label="Queue Filter Tabs"
+            >
+              {/* The Gliding Indicator Pill with Crisp Squaring & Proper Border */}
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute z-0 rounded-[4px] bg-[#002970] border border-[#001f56] shadow-sm transition-all"
+                style={{
+                  left: tabPillStyle?.left ?? 0,
+                  top: tabPillStyle?.top ?? 0,
+                  width: tabPillStyle?.width ?? 0,
+                  height: tabPillStyle?.height ?? 0,
+                  opacity: tabPillStyle ? 1 : 0,
+                  transition:
+                    "left 200ms cubic-bezier(0.23, 1, 0.32, 1), width 200ms cubic-bezier(0.23, 1, 0.32, 1), opacity 150ms ease",
+                }}
+              />
 
-            {TAB_ITEMS.map((tab) => {
-              const isActive = activeTab === tab.id;
-              const hasPill = (hoveredTab ?? activeTab) === tab.id;
+              {TAB_ITEMS.map((tab) => {
+                const isActive = activeTab === tab.id;
+                const hasPill = (hoveredTab ?? activeTab) === tab.id;
 
-              return (
-                <button
-                  key={tab.id}
-                  ref={(el) => { tabItemRefs.current[tab.id] = el; }}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  onMouseEnter={() => setHoveredTab(tab.id)}
-                  className={`relative z-10 flex-1 py-1.5 text-center text-xs font-medium rounded-md transition-colors duration-150 flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00BAF2] cursor-pointer ${
-                    hasPill ? "text-white" : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  {isActive && (
-                    <span className="size-1.5 rounded-full bg-[#00BAF2] animate-pulse shrink-0" />
-                  )}
-                  <span>{tab.label}</span>
-                  <span
-                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold tabular-nums leading-none ${
-                      hasPill ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                return (
+                  <button
+                    key={tab.id}
+                    ref={(el) => { tabItemRefs.current[tab.id] = el; }}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    onMouseEnter={() => setHoveredTab(tab.id)}
+                    className={`relative z-10 flex-1 h-7 text-center text-xs font-medium rounded-[4px] transition-colors duration-150 flex items-center justify-center gap-1.5 focus-visible:outline-none cursor-pointer ${
+                      hasPill ? "text-white font-medium" : "text-slate-600 hover:text-slate-900"
                     }`}
                   >
-                    {tab.count}
-                  </span>
-                </button>
-              );
-            })}
+                    {isActive && (
+                      <span className="size-1.5 rounded-full bg-[#00BAF2] animate-pulse shrink-0" />
+                    )}
+                    <span>{tab.label}</span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded-[3px] text-[10px] font-semibold tabular-nums leading-none transition-colors ${
+                        hasPill ? "bg-white/20 text-white" : "bg-slate-300/60 text-slate-600"
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Ticket List */}
@@ -1059,20 +1044,20 @@ export default function ResolveOS() {
             <span className="text-[10px] font-medium tracking-[0.06em] text-[#6B7280] uppercase block mb-1.5">
               Simulate Inbound WhatsApp
             </span>
-            <form onSubmit={handleSimulateInbound} className="flex gap-1.5">
+            <form onSubmit={handleSimulateInbound} className="flex gap-1.5 items-center">
               <input
                 type="text"
                 value={simText}
                 onChange={(e) => setSimText(e.target.value)}
                 placeholder="e.g. kal ka settlement 14280 nahi aaya"
-                className="flex-1 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:border-[#00BAF2]"
+                className="flex-1 h-7 px-2.5 text-xs border border-slate-300 rounded-[4px] bg-white focus:outline-none focus:border-[#00BAF2]"
               />
               <button
                 type="submit"
                 disabled={simSending || !simText.trim()}
-                className="px-2.5 py-1 bg-[#002970] text-white rounded text-xs font-medium hover:bg-[#001f56] disabled:opacity-50"
+                className="h-7 px-2.5 bg-[#002970] text-white rounded-[4px] text-xs font-medium hover:bg-[#001f56] disabled:opacity-50 flex items-center justify-center transition"
               >
-                <Send className="w-3 h-3" />
+                <Send className="w-3.5 h-3.5" />
               </button>
             </form>
           </div>
