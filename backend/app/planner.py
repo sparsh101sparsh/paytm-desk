@@ -59,7 +59,7 @@ Current Settlements in DB: {json.dumps(settlements)}
 Current Transactions in DB: {json.dumps(transactions)}
 """
         try:
-            with httpx.Client(timeout=30.0) as client:
+            with httpx.Client(timeout=8.0) as client:
                 res = client.post(
                     SARVAM_ENDPOINT,
                     headers={
