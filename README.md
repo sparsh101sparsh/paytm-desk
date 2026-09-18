@@ -2,7 +2,7 @@
 
 > **Track:** Autonomous AI Teammates  
 > **Event:** Paytm ♥ AI Hackathon · Delhi · 19 September 2026  
-> **Core Principle:** *Sarvam proposes. Policy decides. Tools act. Cognee remembers.*  
+> **Core Principle:** *Sarvam understands. Deterministic rules decide. The backend acts.*  
 > **Live Web Board:** https://paytm-desk.vercel.app  
 > **GitHub Repository:** https://github.com/sparsh101sparsh/resolve-os  
 > **Official WhatsApp Channel:** `+1 (555) 201-3457` (Meta WhatsApp Cloud API Sandbox)
@@ -11,7 +11,7 @@
 
 ## Who Processes the Messages? (Processing Pipeline)
 
-When a merchant sends a Hinglish message on WhatsApp, **five distinct systems collaborate in a strict, safety-first pipeline**:
+When a merchant sends a Hinglish message on WhatsApp, **the request moves through a strict, safety-first pipeline**:
 
 ```
 [Merchant Phone] ──(WhatsApp)──► [Meta Cloud API] ──(Webhook)──► [FastAPI Gateway]
@@ -20,20 +20,20 @@ When a merchant sends a Hinglish message on WhatsApp, **five distinct systems co
 │                                                                                      │
 │   1. SARVAM AI (sarvam-105b)      Comprehends Hinglish & proposes a structured plan   │
 │                 │                                                                    │
-│   2. COGNEE MEMORY LAYER          Recalls past merchant retries & risk flags from DB  │
+│   2. MERCHANT HISTORY LAYER       Recalls past merchant retries & risk flags from DB  │
 │                 │                                                                    │
 │   3. DETERMINISTIC POLICY ENGINE  Zero-LLM hard rules: checks ₹50k cap, freeze, UTR  │
 │                 │                 Generates cryptographic policy token (tok_xxxx)    │
 │                 │                                                                    │
-│   4. TOOL EXECUTION RUNTIME       Retries settlement file, updates tickets, logs audit │
+│   4. BACKEND TOOL RUNTIME         Retries settlement file, updates tickets, logs audit │
 │                 │                                                                    │
-│   5. META GRAPH API DISPATCHER    Sends official WhatsApp reply to merchant's phone  │
+│   5. META GRAPH API DISPATCHER    Sends verified WhatsApp reply to merchant's phone  │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 1. **Meta WhatsApp Cloud API**: Receives the incoming merchant message on phone `+1 (555) 201-3457` and forwards the webhook payload to FastAPI (`POST /api/webhook/whatsapp`).
 2. **Sarvam AI (`sarvam-105b`)**: Parses the raw Hinglish text (e.g. *"kal se 14,280 ka settlement nahi aaya"*), identifies the intent (`SETTLEMENT_MISSING`), and proposes a structured draft plan. **Sarvam proposes only—it has zero authority to move money.**
-3. **Cognee Agent Memory Layer**: Queries past merchant settlement history, active risk flags (e.g., AML / `ACCOUNT_FROZEN_SUSPECT`), and past retry attempts from SQLite audit history.
+3. **Merchant History & Context Layer**: Queries past merchant settlement records, active risk flags (e.g., AML / `ACCOUNT_FROZEN_SUSPECT`), and past retry attempts directly from the database audit log.
 4. **Deterministic Policy Engine (`backend/app/policy.py`)**: A pure, non-LLM rule engine that evaluates the proposed plan against Paytm operational limits:
    - Max auto-settlement retry: **₹50,000**
    - Max retries allowed: **2**
@@ -41,8 +41,8 @@ When a merchant sends a Hinglish message on WhatsApp, **five distinct systems co
    - Max refund auto-action: **₹2,000** (requires verified 12-digit UTR; otherwise asks merchant)
    - Freeze/AML check: **Hard escalate to human Risk Ops**
    - Issues a tamper-evident audit token: `tok_sha256(...)`
-5. **Tool Execution Engine (`backend/app/tools.py`)**: Executes approved tools (batch retry, ticket update, WhatsApp template synthesis) and writes every event to the immutable `audit_events` ledger.
-6. **Meta Outbound Dispatcher**: Dispatches the verified Hinglish WhatsApp notification back to the merchant's phone via Meta Graph API.
+5. **Tool Execution Engine (`backend/app/tools.py`)**: Executes approved operations (batch retry, ticket status updates, WhatsApp template generation) and writes every event to the immutable `audit_events` ledger.
+6. **Meta Outbound Dispatcher**: Dispatches the verified Hinglish WhatsApp notification back to the merchant's phone via Meta Graph API using the permanent system user token.
 
 ---
 
@@ -65,10 +65,10 @@ flowchart TD
         SARVAM -->|Proposed JSON Plan\nIntent, Confidence, Proposed Writes| PLAN_OUT[Structured Plan\nSETTLEMENT_MISSING]
     end
 
-    subgraph STAGE2 ["4. Memory & Context Recall"]
-        PLAN_OUT --> COGNEE[Cognee Memory Client\nbackend/app/memory.py]
-        COGNEE <-->|Fetch past retries & risk flags| DB_AUDIT[(SQLite DB\naudit_events + settlements)]
-        COGNEE -->|Memory Chips| CONTEXT[Merchant History & Risk Context]
+    subgraph STAGE2 ["4. History & Context Recall"]
+        PLAN_OUT --> HISTORY[Merchant Dispute History\nbackend/app/memory.py]
+        HISTORY <-->|Fetch past retries & risk flags| DB_AUDIT[(SQLite DB\naudit_events + settlements)]
+        HISTORY -->|Merchant Context| CONTEXT[Merchant History & Risk Context]
     end
 
     subgraph STAGE3 ["5. Deterministic Policy Gate (NO LLM)"]
@@ -85,7 +85,7 @@ flowchart TD
         ALLOW_RETRY --> T_TICKET[execute_update_ticket\nStatus: RESOLVED]
         ESC_RISK --> T_BRIEF[execute_assign_human\nSynthesize 6-Line Ops Brief]
         ESC_RISK --> T_TICKET_ESC[execute_update_ticket\nStatus: ESCALATED]
-        T_RETRY --> AUDIT_LOG[(SQLite audit_events\nActor: POLICY, N8N, SARVAM)]
+        T_RETRY --> AUDIT_LOG[(SQLite audit_events\nActor: POLICY, BACKEND, SARVAM)]
         T_BRIEF --> AUDIT_LOG
     end
 
@@ -109,19 +109,18 @@ flowchart TD
 
 ---
 
-## Honest Partner Stack Breakdown
+## What is Live vs What is Test Data (100% Honest)
 
-| Component | Role in Resolve OS | Implementation Status |
+| Component | Role in Resolve OS | Status |
 |---|---|---|
-| **Sarvam AI (`sarvam-105b`)** | Hinglish natural language comprehension & structured action plan proposals | ✅ **Live API** (`https://api.sarvam.ai/v1/chat/completions`) |
-| **Deterministic Policy Engine** | Non-LLM mathematical and boolean rule engine enforcing financial risk limits | ✅ **Real code + 100% test coverage** |
-| **FastAPI + SQLite Backend** | Runs core lifecycle, maintains ledger, generates audit tokens | ✅ **Live local & Vercel runtime** |
+| **Sarvam AI (`sarvam-105b`)** | Hinglish comprehension and structured action plan proposals | ✅ **Live API** (`https://api.sarvam.ai/v1/chat/completions`) |
+| **Deterministic Policy Engine** | Non-LLM mathematical and boolean rule engine enforcing financial limits | ✅ **Real code + 100% test coverage** |
 | **Meta WhatsApp Cloud API** | Inbound merchant messaging webhook & outbound templated notifications | ✅ **Live on Sandbox phone `+1 555-201-3457`** |
-| **n8n Workflow Runtime** | Visual orchestration graph (`n8n/desk-merchant-ticket.json`) | ✅ **Importable JSON workflow** (run locally to watch nodes turn green) |
-| **Cognee Agent Memory** | Historical recall of merchant retry counts & past dispute resolutions | ⚠️ **Simulated via SQLite audit history** (`COGNEE_OPTIONAL=1`) |
+| **FastAPI Backend & Tools** | Executes approved actions, generates cryptographic policy tokens | ✅ **Live local & Vercel runtime** |
+| **Merchant History & Audit Ledger** | Real-time dispute history and previous action tracking in SQLite | ✅ **Live SQLite database** |
 | **Paytm Core Ledger** | Settlements, transactions, merchants, and devices tables | ✅ **Seeded realistic test data** (labeled TEST DATA) |
 
-> **The Honest Line:** Sarvam 105b, Meta WhatsApp Cloud API, and our deterministic policy engine are completely real and live. n8n workflow ships as an importable JSON graph. Cognee is simulated via our local SQLite audit history. Paytm core banking APIs are simulated via SQLite test fixtures.
+> **The Honest Line:** Sarvam 105b, Meta WhatsApp Cloud API, and our deterministic policy engine are completely real and live. Paytm core banking APIs are not publicly accessible to hackathon teams, so the ledger is realistic test data labeled TEST DATA.
 
 ---
 
