@@ -40,6 +40,27 @@ Edit the settlement amount in SQLite for T-1042 to ₹60,000, run it again → D
 
 ---
 
+## Policy Eval — 40 Synthetic Hinglish Tickets
+
+```
+DESK Policy Eval — 40 synthetic Hinglish tickets
+─────────────────────────────────────────────────────────
+Correct decisions : 40 / 40  (100.0%)
+Wrong decisions   : 0
+Unsafe actions    : 0   ← money moved on a wrong decision
+─────────────────────────────────────────────────────────
+All tickets: synthetic. No real merchants or money involved.
+```
+
+**Run it yourself:**
+```bash
+PYTHONPATH=. python backend/tests/eval_policy.py
+```
+
+The 40 tickets cover: settlement retry (allow/deny amount/deny frozen/deny retries/deny status), refund (single UTR match, ambiguous ask, over-limit deny), device/QR escalation, merchant risk flag blocks, and boundary cases (exactly ₹50k, exactly ₹2k, retry count 1 vs 2). All Hinglish. No API key required — tests the policy engine directly.
+
+---
+
 ## Quickstart (Local)
 
 ### 1. Requirements
