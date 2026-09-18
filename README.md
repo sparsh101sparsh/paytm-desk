@@ -4,7 +4,7 @@
 > **Event:** Paytm ♥ AI Hackathon · Delhi · 19 September 2026  
 > **Core Principle:** *Sarvam proposes. Policy decides. Tools act. Cognee remembers.*  
 > **Live Web Board:** https://paytm-desk.vercel.app  
-> **GitHub Repository:** https://github.com/sparsh101sparsh/paytm-desk  
+> **GitHub Repository:** https://github.com/sparsh101sparsh/resolve-os  
 > **Official WhatsApp Channel:** `+1 (555) 201-3457` (Meta WhatsApp Cloud API Sandbox)
 
 ---
@@ -179,8 +179,8 @@ Covers:
 ### 2. Backend Setup
 ```bash
 # Clone and enter directory:
-git clone https://github.com/sparsh101sparsh/paytm-desk.git
-cd paytm-desk
+git clone https://github.com/sparsh101sparsh/resolve-os.git
+cd resolve-os
 
 # Create virtual environment:
 python3 -m venv .venv
