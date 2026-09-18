@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from "react";
 import {
   CheckCircle2,
   AlertCircle,
@@ -15,6 +15,12 @@ import {
   X,
   Info,
   MessageSquare,
+  Upload,
+  Brain,
+  Database,
+  Sliders,
+  SendHorizontal,
+  ArrowRight,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -129,6 +135,19 @@ export default function ResolveOS() {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [fallbackLedger, setFallbackLedger] = useState<{ merchant: any; settlements: Settlement[] } | null>(null);
 
+  // Tab State & Gliding Indicator Tracking (NETRA Pattern)
+  const [activeTab, setActiveTab] = useState<"hero" | "whatsapp" | "all">("all");
+  const [hoveredTab, setHoveredTab] = useState<string | null>(null);
+  const [tabPillStyle, setTabPillStyle] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
+  const tabItemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  // Header Actions Gliding Indicator Tracking (NETRA Pattern)
+  const [hoveredHeaderBtn, setHoveredHeaderBtn] = useState<string | null>(null);
+  const [headerPillStyle, setHeaderPillStyle] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  const headerContainerRef = useRef<HTMLDivElement>(null);
+  const headerBtnRefs = useRef<Record<string, HTMLElement | null>>({});
+
   const [loading, setLoading] = useState<boolean>(true);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [elapsed, setElapsed] = useState<number>(0);
@@ -227,19 +246,6 @@ export default function ResolveOS() {
     return () => clearInterval(interval);
   }, [fetchHealth, fetchTickets, fetchFallbackLedger]);
 
-  // Sync selection with available tickets
-  useEffect(() => {
-    if (tickets.length > 0) {
-      if (!selectedId || !tickets.some((t) => t.id === selectedId)) {
-        setSelectedId(tickets[0].id);
-      }
-    } else {
-      setSelectedId("");
-      setDetail(null);
-      setEvents([]);
-    }
-  }, [tickets, selectedId]);
-
   // Keep detail & audit events updated for selected ticket
   useEffect(() => {
     if (selectedId) {
@@ -256,7 +262,100 @@ export default function ResolveOS() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // ─── Active Entities & Computed Values ─────────────────────────────────────
+  // ─── Gliding Pill Layout Calculations (NETRA Pattern) ─────────────────────
+
+  // Reposition Queue Tab Gliding Pill
+  useLayoutEffect(() => {
+    const updateTabPosition = () => {
+      const targetId = hoveredTab ?? activeTab;
+      const targetElement = tabItemRefs.current[targetId];
+      const container = tabsContainerRef.current;
+
+      if (targetElement && container) {
+        const isDirect = targetElement.offsetParent === container;
+        const left = isDirect
+          ? targetElement.offsetLeft
+          : targetElement.getBoundingClientRect().left - container.getBoundingClientRect().left;
+        const top = isDirect
+          ? targetElement.offsetTop
+          : targetElement.getBoundingClientRect().top - container.getBoundingClientRect().top;
+        const width = isDirect
+          ? targetElement.offsetWidth
+          : targetElement.getBoundingClientRect().width;
+        const height = isDirect
+          ? targetElement.offsetHeight
+          : targetElement.getBoundingClientRect().height;
+
+        setTabPillStyle({ left, top, width, height });
+      }
+    };
+
+    updateTabPosition();
+    window.addEventListener("resize", updateTabPosition);
+    return () => window.removeEventListener("resize", updateTabPosition);
+  }, [hoveredTab, activeTab]);
+
+  // Reposition Header Action Gliding Pill
+  useLayoutEffect(() => {
+    const updateHeaderPosition = () => {
+      if (!hoveredHeaderBtn) {
+        setHeaderPillStyle(null);
+        return;
+      }
+      const targetElement = headerBtnRefs.current[hoveredHeaderBtn];
+      const container = headerContainerRef.current;
+
+      if (targetElement && container) {
+        const isDirect = targetElement.offsetParent === container;
+        const left = isDirect
+          ? targetElement.offsetLeft
+          : targetElement.getBoundingClientRect().left - container.getBoundingClientRect().left;
+        const top = isDirect
+          ? targetElement.offsetTop
+          : targetElement.getBoundingClientRect().top - container.getBoundingClientRect().top;
+        const width = isDirect
+          ? targetElement.offsetWidth
+          : targetElement.getBoundingClientRect().width;
+        const height = isDirect
+          ? targetElement.offsetHeight
+          : targetElement.getBoundingClientRect().height;
+
+        setHeaderPillStyle({ left, top, width, height });
+      }
+    };
+
+    updateHeaderPosition();
+    window.addEventListener("resize", updateHeaderPosition);
+    return () => window.removeEventListener("resize", updateHeaderPosition);
+  }, [hoveredHeaderBtn]);
+
+  // ─── Filtered Tickets & Active Entities ────────────────────────────────────
+  const heroIds = ["T-1042", "T-1048", "T-1055"];
+
+  const filteredTickets = useMemo(() => {
+    if (activeTab === "hero") {
+      return tickets.filter((t) => heroIds.includes(t.id));
+    }
+    if (activeTab === "whatsapp") {
+      return tickets.filter(
+        (t) => t.id.startsWith("T-WA") || (t.channel === "WhatsApp" && !heroIds.includes(t.id))
+      );
+    }
+    return tickets;
+  }, [tickets, activeTab]);
+
+  // Sync selection with available filtered tickets
+  useEffect(() => {
+    if (filteredTickets.length > 0) {
+      if (!selectedId || !filteredTickets.some((t) => t.id === selectedId)) {
+        setSelectedId(filteredTickets[0].id);
+      }
+    } else {
+      setSelectedId("");
+      setDetail(null);
+      setEvents([]);
+    }
+  }, [filteredTickets, selectedId]);
 
   const selectedTicket = detail?.ticket || tickets.find((t) => t.id === selectedId) || null;
 
@@ -381,7 +480,7 @@ export default function ResolveOS() {
         body: JSON.stringify({ merchant_id: activeMerchantId }),
       });
       if (res.ok) {
-        showToast("success", `Active merchant ledger reset to initial state.`);
+        showToast("success", `Active merchant ledger reset.`);
         if (selectedId) await fetchDetail(selectedId);
         await Promise.all([fetchTickets(), fetchFallbackLedger()]);
       }
@@ -432,6 +531,7 @@ export default function ResolveOS() {
         await fetchTickets();
         if (data.ticket_id) {
           setSelectedId(data.ticket_id);
+          setActiveTab("all");
           await fetchDetail(data.ticket_id);
         }
         showToast("success", `Inbound WhatsApp message processed → ${data.ticket_id}`);
@@ -488,42 +588,70 @@ export default function ResolveOS() {
     },
   ];
 
+  const TAB_ITEMS = [
+    { id: "hero", label: "Hero demo" },
+    { id: "whatsapp", label: "WhatsApp live" },
+    { id: "all", label: "All" },
+  ] as const;
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#F5F7FB] text-[#1B1F3B] font-sans antialiased select-none">
       {/* ─── Top Bar (40px Paytm Navy #002970) ─────────────────────────────── */}
       <header className="h-[40px] shrink-0 bg-[#002970] border-b border-[#00BAF2]/30 flex items-center justify-between px-4 z-20">
         {/* Left: Brand */}
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded bg-[#00BAF2] flex items-center justify-center font-medium text-[11px] text-white">
-            R
-          </div>
+          <img
+            src="/favicon.svg"
+            alt="Resolve OS"
+            className="w-5 h-5 rounded object-contain shrink-0"
+          />
           <span className="text-white font-medium text-[14px] tracking-tight">Resolve OS</span>
           <span className="text-white/70 text-xs font-normal">Merchant Support</span>
         </div>
 
-        {/* Center: ONE PILL ONLY */}
-        <div className="flex items-center">
-          {health?.sarvam === "fixture" ? (
-            <span className="px-2 py-0.5 rounded text-[10px] font-medium tracking-[0.06em] uppercase bg-red-500/20 text-red-300 border border-red-500/40">
-              SARVAM FIXTURE
-            </span>
-          ) : (
-            <span className="px-2 py-0.5 rounded text-[10px] font-medium tracking-[0.06em] uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40">
-              TEST DATA
-            </span>
-          )}
-        </div>
-
-        {/* Right: Reset Demo, Health, Help */}
+        {/* Right: Header Controls with NETRA Gliding Highlight */}
         <div className="flex items-center gap-3">
-          <button
-            onClick={handleReset}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-white/80 hover:text-white bg-white/10 hover:bg-white/15 rounded transition"
-            title="Clear tickets and reset test ledger"
+          <div
+            ref={headerContainerRef}
+            onMouseLeave={() => setHoveredHeaderBtn(null)}
+            className="relative flex items-center gap-1 p-0.5 rounded-lg bg-black/15"
           >
-            <RotateCcw className="w-3 h-3 text-[#00BAF2]" />
-            <span>Reset demo</span>
-          </button>
+            {/* Sliding Pill Indicator for Header Controls */}
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute z-0 rounded-md bg-white/20 transition-all"
+              style={{
+                left: headerPillStyle?.left ?? 0,
+                top: headerPillStyle?.top ?? 0,
+                width: headerPillStyle?.width ?? 0,
+                height: headerPillStyle?.height ?? 0,
+                opacity: headerPillStyle && hoveredHeaderBtn ? 1 : 0,
+                transition:
+                  "left 240ms cubic-bezier(0.23, 1, 0.32, 1), top 240ms cubic-bezier(0.23, 1, 0.32, 1), width 240ms cubic-bezier(0.23, 1, 0.32, 1), height 240ms cubic-bezier(0.23, 1, 0.32, 1), opacity 150ms ease",
+              }}
+            />
+
+            <button
+              ref={(el) => { headerBtnRefs.current["reset"] = el; }}
+              onMouseEnter={() => setHoveredHeaderBtn("reset")}
+              onClick={handleReset}
+              className="relative z-10 flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-white/90 hover:text-white rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00BAF2]"
+              title="Clear tickets and reset test ledger"
+            >
+              <RotateCcw className="w-3 h-3 text-[#00BAF2]" />
+              <span>Reset demo</span>
+            </button>
+
+            <button
+              ref={(el) => { headerBtnRefs.current["arch"] = el; }}
+              onMouseEnter={() => setHoveredHeaderBtn("arch")}
+              onClick={() => setShowArchPopover(!showArchPopover)}
+              className="relative z-10 w-7 h-6 flex items-center justify-center text-white/80 hover:text-white rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00BAF2]"
+              title="Architecture Flowchart"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
           <div className="h-3 w-px bg-white/20" />
 
@@ -542,36 +670,178 @@ export default function ResolveOS() {
               <span className="hidden sm:inline">WhatsApp</span>
             </div>
           </div>
-
-          <div className="h-3 w-px bg-white/20" />
-
-          <button
-            onClick={() => setShowArchPopover(!showArchPopover)}
-            className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition"
-            title="Architecture"
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-          </button>
         </div>
       </header>
 
-      {/* ─── Architecture Popover ────────────────────────────────────────── */}
+      {/* ─── NETRA-Inspired Forensic Architecture Flowchart Popover ───────── */}
       {showArchPopover && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-lg shadow-xl border border-slate-200 max-w-md w-full p-5 space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <h3 className="font-medium text-[#002970] text-sm">Resolve OS Architecture</h3>
-              <button onClick={() => setShowArchPopover(false)} className="text-slate-400 hover:text-slate-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-300 max-w-4xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-[#002970] text-white">
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="/favicon.svg"
+                  alt="Resolve OS"
+                  className="size-6 rounded object-contain shrink-0"
+                />
+                <div>
+                  <h3 className="font-medium text-sm text-white">Resolve OS Forensic Architecture Flowchart</h3>
+                  <p className="text-[11px] text-white/70 font-normal">Multi-Modal Ops Teammate Engine &middot; Sarvam 105B &middot; Deterministic Policy</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowArchPopover(false)}
+                className="size-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition focus-visible:outline-none"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-xs text-slate-800 font-medium bg-slate-50 p-2.5 rounded border border-slate-200">
-              Hinglish ticket in → Sarvam proposes → rules read the ledger → one of three endings → audit.
-            </p>
-            <div className="text-xs text-slate-600 space-y-1.5 leading-relaxed font-normal">
-              <p>• <strong>Sarvam 105B:</strong> Interprets Hinglish and proposes actions. Proposes only — model never touches funds.</p>
-              <p>• <strong>Deterministic Policy:</strong> Zero-LLM hard rules enforce Paytm caps (≤ ₹50k, 0 AML flags, &lt; 2 retries).</p>
-              <p>• <strong>Three Endings:</strong> RESOLVED (pushed retry), WAITING (asks UTR), ESCALATED (Risk Ops brief).</p>
+
+            {/* Dotted Canvas Body Inspired by NETRA Flowchart */}
+            <div className="p-6 overflow-y-auto ros-dotted-canvas bg-slate-50/70 space-y-6 flex-1">
+              {/* Slogan pill */}
+              <div className="flex justify-center">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-[#00BAF2]/30 shadow-sm text-xs text-slate-800">
+                  <span className="size-1.5 rounded-full bg-[#00BAF2] animate-pulse" />
+                  <span className="font-medium">Core Axiom:</span>
+                  <span className="text-slate-600">Hinglish ticket in &rarr; Sarvam proposes &rarr; rules read the ledger &rarr; one of three endings &rarr; audit.</span>
+                </div>
+              </div>
+
+              {/* 5-Stage Connected Pipeline Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-stretch relative">
+                {/* Node 1: Ingress */}
+                <div className="bg-white rounded-lg border border-slate-200 p-3.5 shadow-sm space-y-2 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
+                        INGRESS
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">&lt; 80ms</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-900">
+                      <Upload className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Inbound Gateway</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                      Meta WhatsApp webhook receiver + desk UI simulation intake.
+                    </p>
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-100">
+                    Channel: WhatsApp / Direct
+                  </div>
+                </div>
+
+                {/* Node 2: Sarvam */}
+                <div className="bg-white rounded-lg border border-slate-200 p-3.5 shadow-sm space-y-2 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        SARVAM 105B
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">~350ms</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-900">
+                      <Brain className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Hinglish Planner</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                      Interprets Hinglish nuance, extracts amounts, and proposes structured action JSON.
+                    </p>
+                  </div>
+                  <div className="text-[10px] font-mono text-amber-700 pt-1 border-t border-slate-100 font-medium">
+                    Proposes ONLY &middot; Zero fund rights
+                  </div>
+                </div>
+
+                {/* Node 3: Memory */}
+                <div className="bg-white rounded-lg border border-slate-200 p-3.5 shadow-sm space-y-2 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">
+                        MEMORY
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">120ms</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-900">
+                      <Database className="w-3.5 h-3.5 text-sky-600" />
+                      <span>Ledger Memory</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                      Retrieves active merchant context, freeze flags, and past ticket resolutions.
+                    </p>
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-100">
+                    SQLite + Stand-in Ledger
+                  </div>
+                </div>
+
+                {/* Node 4: Policy Engine */}
+                <div className="bg-white rounded-lg border-2 border-[#00BAF2] p-3.5 shadow-sm space-y-2 flex flex-col justify-between bg-cyan-50/20">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold">
+                        POLICY ENGINE
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">45ms</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-900">
+                      <Sliders className="w-3.5 h-3.5 text-[#002970]" />
+                      <span>Deterministic Rules</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                      Zero-LLM Python rules. Enforces &le; &#8377;50k cap, 0 freeze flags, and &lt; 2 retries.
+                    </p>
+                  </div>
+                  <div className="text-[10px] font-mono text-emerald-800 pt-1 border-t border-cyan-200 font-medium">
+                    Issues SHA-256 Policy Token
+                  </div>
+                </div>
+
+                {/* Node 5: Action Outpost */}
+                <div className="bg-white rounded-lg border border-slate-200 p-3.5 shadow-sm space-y-2 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        OUTPOST
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">Realtime</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-900">
+                      <SendHorizontal className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Bank &amp; WhatsApp</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                      Pushes settlement retry, updates ledger, and sends Meta WhatsApp response.
+                    </p>
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-100">
+                    Immutable Audit Logged
+                  </div>
+                </div>
+              </div>
+
+              {/* 3 Endings Summary Bar */}
+              <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-2">
+                <span className="text-[10px] font-medium tracking-[0.06em] uppercase text-slate-400 block">
+                  THE THREE POLICY ENDINGS
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="p-2.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-950">
+                    <span className="font-semibold block">1. RESOLVED</span>
+                    <span className="text-[11px] text-emerald-800">Settlement retry executed. Bank file updated. WhatsApp confirmation dispatched.</span>
+                  </div>
+                  <div className="p-2.5 rounded bg-amber-50 border border-amber-200 text-amber-950">
+                    <span className="font-semibold block">2. WAITING ON MERCHANT</span>
+                    <span className="text-[11px] text-amber-800">Ambiguity or missing 12-digit UTR. Asks merchant for details. Zero payouts made.</span>
+                  </div>
+                  <div className="p-2.5 rounded bg-red-50 border border-red-200 text-red-950">
+                    <span className="font-semibold block">3. ESCALATED</span>
+                    <span className="text-[11px] text-red-800">AML freeze or &gt; &#8377;50k. Compiles structured brief for human Risk Ops review.</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -587,8 +857,54 @@ export default function ResolveOS() {
           <div className="p-3 border-b border-[#E5E7EB] flex items-center justify-between shrink-0">
             <span className="font-medium text-[13px] text-[#002970]">Queue</span>
             <span className="text-[11px] font-normal text-slate-500">
-              {tickets.filter((t) => t.status === "OPEN").length} open · {tickets.length} total
+              {filteredTickets.filter((t) => t.status === "OPEN").length} open &middot; {filteredTickets.length} total
             </span>
+          </div>
+
+          {/* NETRA-Inspired Gliding Filter Tabs */}
+          <div
+            ref={tabsContainerRef}
+            onMouseLeave={() => setHoveredTab(null)}
+            className="relative flex items-center p-1 bg-slate-100/90 border-b border-[#E5E7EB] text-xs font-medium select-none"
+            aria-label="Queue Filter Tabs"
+          >
+            {/* The Gliding Indicator Pill with Beautiful-UI bezier curve */}
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute z-0 rounded-md bg-[#002970] shadow-sm transition-all"
+              style={{
+                left: tabPillStyle?.left ?? 0,
+                top: tabPillStyle?.top ?? 0,
+                width: tabPillStyle?.width ?? 0,
+                height: tabPillStyle?.height ?? 0,
+                opacity: tabPillStyle ? 1 : 0,
+                transition:
+                  "left 240ms cubic-bezier(0.23, 1, 0.32, 1), top 240ms cubic-bezier(0.23, 1, 0.32, 1), width 240ms cubic-bezier(0.23, 1, 0.32, 1), height 240ms cubic-bezier(0.23, 1, 0.32, 1), opacity 150ms ease",
+              }}
+            />
+
+            {TAB_ITEMS.map((tab) => {
+              const isActive = activeTab === tab.id;
+              const hasPill = (hoveredTab ?? activeTab) === tab.id;
+
+              return (
+                <button
+                  key={tab.id}
+                  ref={(el) => { tabItemRefs.current[tab.id] = el; }}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  onMouseEnter={() => setHoveredTab(tab.id)}
+                  className={`relative z-10 flex-1 py-1.5 text-center text-xs font-medium rounded-md transition-colors duration-150 flex items-center justify-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00BAF2] cursor-pointer ${
+                    hasPill ? "text-white" : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {isActive && (
+                    <span className="size-1.5 rounded-full bg-[#00BAF2] animate-pulse shrink-0" />
+                  )}
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Ticket List */}
@@ -602,15 +918,15 @@ export default function ResolveOS() {
                   </div>
                 ))}
               </div>
-            ) : tickets.length === 0 ? (
+            ) : filteredTickets.length === 0 ? (
               <div className="p-6 text-center text-xs text-slate-400 space-y-1.5 my-auto">
-                <div className="font-medium text-slate-600">No active tickets</div>
+                <div className="font-medium text-slate-600">No tickets in this queue</div>
                 <div className="text-[11px] text-slate-400">
                   Send a message from WhatsApp or use the test sender below.
                 </div>
               </div>
             ) : (
-              tickets.map((ticket) => {
+              filteredTickets.map((ticket) => {
                 const isSelected = ticket.id === selectedId;
 
                 return (
@@ -910,13 +1226,6 @@ export default function ResolveOS() {
                 Source: SQLite · TEST DATA
               </span>
             </div>
-
-            {/* SINGLE Warning Banner */}
-            {isContradiction && (
-              <div className="p-2 bg-red-100/90 border border-red-300 rounded text-red-900 font-medium text-xs">
-                Already settled in test DB · reset demo
-              </div>
-            )}
 
             {primarySettlement ? (
               <div className="space-y-1.5 text-xs font-normal">

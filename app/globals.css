@@ -38,3 +38,20 @@ body {
 .stagger-2 { animation-delay: 700ms; }
 .stagger-3 { animation-delay: 1050ms; }
 .stagger-4 { animation-delay: 1400ms; }
+
+/* NETRA-inspired forensic dotted grid canvas */
+.ros-dotted-canvas {
+  background-image: radial-gradient(circle, rgba(0, 41, 112, 0.12) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Accessibility: prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+

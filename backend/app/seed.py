@@ -10,7 +10,7 @@ from .db import get_db, init_db, now_iso
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 
-def seed_database(seed_hero_tickets: bool = False):
+def seed_database(seed_hero_tickets: bool = True):
     init_db()
     conn = get_db()
     cur = conn.cursor()

@@ -55,8 +55,8 @@ def health():
 @app.post("/demo/reset")
 @app.post("/api/demo/reset")
 def reset_demo():
-    seed_database(seed_hero_tickets=False)
-    return {"status": "ok", "message": "Demo reset: tickets cleared, test ledger initialized."}
+    seed_database(seed_hero_tickets=True)
+    return {"status": "ok", "message": "Demo reset: hero tickets loaded, test ledger initialized."}
 
 @app.post("/api/demo/set-amount")
 def demo_set_amount(body: Dict[str, Any]):
@@ -147,7 +147,7 @@ def get_tickets():
         SELECT t.*, m.name as merchant_name, m.city as merchant_city, m.category as merchant_category
         FROM tickets t
         JOIN merchants m ON t.merchant_id = m.id
-        ORDER BY t.id ASC
+        ORDER BY t.created_at DESC
     """)
     tickets = [dict(r) for r in cur.fetchall()]
     conn.close()
@@ -285,6 +285,14 @@ def run_desk(ticket_id: str, request: Request = None, recipient_phone: Optional[
 
     # 1. SARVAM Planner
     plan, planner_actor, planner_latency = generate_plan(db_state)
+    conn_t = get_db()
+    if plan.amount_mentioned and not ticket.get("amount"):
+        conn_t.execute("UPDATE tickets SET intent = ?, amount = ? WHERE id = ?", (plan.intent, float(plan.amount_mentioned), ticket_id))
+    else:
+        conn_t.execute("UPDATE tickets SET intent = ? WHERE id = ?", (plan.intent, ticket_id))
+    conn_t.commit()
+    conn_t.close()
+
     log_audit(
         ticket_id=ticket_id,
         actor=planner_actor,
@@ -654,15 +662,15 @@ async def receive_meta_whatsapp(request: Request):
             cur.execute("UPDATE merchants SET phone = ? WHERE id = ?", (clean_phone, merchant_id))
             conn.commit()
 
-    # 3. Fallback to primary demo merchant m_me if matches demo phone or default
+    # 3. Fallback to primary demo merchant m_me
     if not merchant_id:
-        cur.execute("SELECT id, phone FROM merchants WHERE id = 'm_me'")
+        cur.execute("SELECT id, name, phone FROM merchants WHERE id = 'm_me'")
         m_me = cur.fetchone()
-        if m_me and (m_me["phone"] == clean_phone or clean_phone in ["919810012345", "15550234567"]):
+        if m_me:
             merchant_id = "m_me"
-            if sender_name and sender_name.lower() not in ["test user", "test user name", "unknown", ""]:
-                cur.execute("UPDATE merchants SET name = ?, phone = ? WHERE id = 'm_me'", (sender_name, clean_phone))
-                conn.commit()
+            display_name = sender_name if (sender_name and sender_name.lower() not in ["test user", "test user name", "unknown", ""]) else m_me["name"]
+            cur.execute("UPDATE merchants SET name = ?, phone = ? WHERE id = 'm_me'", (display_name, clean_phone))
+            conn.commit()
 
     # 4. If new sender phone, create dedicated merchant row & test ledger
     if not merchant_id:
