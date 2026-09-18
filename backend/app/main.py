@@ -1,7 +1,7 @@
 """
 FastAPI application for Resolve OS — Merchant Support Teammate.
 Merchant support operations engine.
-"Sarvam proposes. Policy decides. n8n acts. Cognee remembers."
+"Sarvam proposes. Policy decides. Python acts. SQLite remembers."
 """
 import os
 import json
@@ -42,15 +42,13 @@ app.add_middleware(
 @app.get("/health")
 @app.get("/api/health")
 def health():
-    import os
-    cognee_optional = os.getenv("COGNEE_OPTIONAL", "0") == "1"
-    cognee_status = "simulation (COGNEE_OPTIONAL=1)" if cognee_optional else "down"
     return {
         "status": "healthy",
         "database": "sqlite:ok",
         "sarvam": "live" if SARVAM_API_KEY else "fixture",
-        "cognee": cognee_status,
-        "n8n": "ready"
+        "whatsapp": "meta_cloud_api",
+        "n8n": "not_used",
+        "cognee": "not_used",
     }
 
 @app.post("/demo/reset")
@@ -266,6 +264,20 @@ def run_desk(ticket_id: str, request: Request = None, recipient_phone: Optional[
         execute_update_ticket(ticket_id, "WAITING_ON_MERCHANT", decision.policy_token)
         remember_outcome(ticket_id, merchant.get("id"), "ask_merchant_utr", "WAITING_ON_MERCHANT")
 
+    elif decision.allowed and decision.action == "request_refund":
+        execute_update_ticket(ticket_id, "RESOLVED", decision.policy_token)
+        execute_send_whatsapp(
+            ticket_id=ticket_id,
+            template_id="refund_initiated",
+            variables={
+                "merchant_name": merchant.get("name", "Merchant"),
+                "ticket_id": ticket_id,
+                "amount": f"{decision.args.get('amount', 0):,.0f}"
+            },
+            recipient_phone=recipient_phone
+        )
+        remember_outcome(ticket_id, merchant.get("id"), "request_refund", "REFUND_OK")
+
     elif decision.next_ticket_status == "ESCALATED":
         brief_info = {
             "merchant_name": merchant.get("name", "Unknown"),
@@ -417,19 +429,18 @@ async def receive_meta_whatsapp(request: Request):
     else:
         merchant_id = "m_2041"
 
-    # Extract numeric amount if mentioned
+    # Extract numeric amount if mentioned — prefer last large number (most likely rupee amount)
     import re
-    amount_match = re.search(r'(\d+[\d,]*)', sender_text.replace(" ", ""))
+    all_amounts = re.findall(r'\b(\d[\d,]{2,})\b', sender_text)
     amount_val = None
-    if amount_match:
+    if all_amounts:
         try:
-            amount_val = float(amount_match.group(1).replace(",", ""))
+            amount_val = float(all_amounts[-1].replace(",", ""))
         except Exception:
             amount_val = None
 
-    # Generate new Ticket ID
-    import random
-    ticket_id = f"T-WA{random.randint(100, 999)}"
+    # Generate new Ticket ID — use UUID to avoid PRIMARY KEY collisions (old randint had only 900 values)
+    ticket_id = f"T-WA{uuid.uuid4().hex[:6].upper()}"
 
     conn = get_db()
     cur = conn.cursor()

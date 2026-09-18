@@ -20,7 +20,11 @@ WHATSAPP_TEMPLATES = {
     "escalated_risk": (
         "Namaste {merchant_name}, Resolve OS here. Aapka case verification ke liye "
         "Risk Ops desk ko transfer kiya gaya hai. Ticket {ticket_id}."
-    )
+    ),
+    "refund_initiated": (
+        "Namaste {merchant_name}, Resolve OS here. Aapke customer ka refund ₹{amount} "
+        "process ho gaya hai. 2-3 business days mein credit hoga. Ticket {ticket_id}."
+    ),
 }
 
 

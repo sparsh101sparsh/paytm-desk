@@ -9,7 +9,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-DB_PATH = os.getenv("RESOLVEOS_DB_PATH", os.getenv("Resolve OS_DB_PATH", str(Path(__file__).resolve().parent.parent / "desk.db")))
+DB_PATH = os.getenv("RESOLVEOS_DB_PATH", str(Path(__file__).resolve().parent.parent / "desk.db"))
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)

@@ -3,15 +3,20 @@ import sys
 import shutil
 from pathlib import Path
 
+# CRITICAL: Set RESOLVEOS_DB_PATH BEFORE importing any backend modules.
+# db.py reads this env var at module import time (module-level DB_PATH assignment).
+# If we set it after the import, db.py will have already resolved to the wrong path.
+tmp_db = Path("/tmp/desk.db")
+os.environ["RESOLVEOS_DB_PATH"] = str(tmp_db)
+os.environ["DESK_DB_PATH"] = str(tmp_db)
+os.environ["COGNEE_OPTIONAL"] = os.getenv("COGNEE_OPTIONAL", "1")
+
 # Add project root to sys.path
 root_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(root_dir))
 
-# Configure SQLite DB in /tmp for Vercel serverless environment
-tmp_db = Path("/tmp/desk.db")
-src_db = root_dir / "backend" / "desk.db"
-
 # Seed / initialize in /tmp
+src_db = root_dir / "backend" / "desk.db"
 if not tmp_db.exists():
     if src_db.exists():
         try:
@@ -19,17 +24,10 @@ if not tmp_db.exists():
         except Exception:
             pass
     if not tmp_db.exists():
-        os.environ["RESOLVEOS_DB_PATH"] = str(tmp_db)
-        os.environ["DESK_DB_PATH"] = str(tmp_db)
-        os.environ["COGNEE_OPTIONAL"] = "1"
         try:
             from backend.app.seed import seed_database
             seed_database()
         except Exception as e:
             print("Seed error on cold start:", e)
-
-os.environ["RESOLVEOS_DB_PATH"] = str(tmp_db)
-os.environ["DESK_DB_PATH"] = str(tmp_db)
-os.environ["COGNEE_OPTIONAL"] = os.getenv("COGNEE_OPTIONAL", "1")
 
 from backend.app.main import app
