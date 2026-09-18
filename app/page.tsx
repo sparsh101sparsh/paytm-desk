@@ -4,15 +4,14 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   CheckCircle2,
   AlertCircle,
-  Clock,
   RotateCcw,
   Play,
   ShieldAlert,
-  Sliders,
+  ChevronRight,
+  ChevronDown,
   Check,
   User,
   HelpCircle,
-  AlertTriangle,
   Send,
   X,
   Info,
@@ -139,8 +138,9 @@ export default function ResolveOS() {
   const [health, setHealth] = useState<{ status: string; sarvam: string; whatsapp: string; database: string } | null>(null);
   const [apiError, setApiError] = useState<boolean>(false);
 
-  // Demo tool state
+  // Demo tools collapsed state
   const [customAmount, setCustomAmount] = useState<string>("200000");
+  const [demoToolsOpen, setDemoToolsOpen] = useState<boolean>(false);
   const [showArchPopover, setShowArchPopover] = useState<boolean>(false);
 
   // WhatsApp simulation composer
@@ -212,7 +212,7 @@ export default function ResolveOS() {
 
   const showToast = (type: "success" | "error" | "info", msg: string) => {
     setToast({ type, msg });
-    setTimeout(() => setToast(null), 3500);
+    setTimeout(() => setToast(null), 3000);
   };
 
   // ─── Actions ───────────────────────────────────────────────────────────────
@@ -271,7 +271,6 @@ export default function ResolveOS() {
     }
   };
 
-  // Stage Demo Tools
   const handleSetAmount = async () => {
     if (!detail?.ticket.merchant_id) return;
     try {
@@ -409,62 +408,48 @@ export default function ResolveOS() {
     primarySettlement.status === "SUCCESS" &&
     selectedTicket?.status === "OPEN";
 
-  // ─── Render Pipeline Stations ──────────────────────────────────────────────
+  // ─── Stations ──────────────────────────────────────────────────────────────
 
   const understoodEv = events.find((e) => e.type === "UNDERSTOOD");
   const recalledEv = events.find((e) => e.type === "RECALLED");
   const decidedEv = events.find((e) => e.type === "DECIDED");
   const actedEv = events.find((e) => e.type === "ACTED");
-  const notifiedEv = events.find((e) => e.type === "NOTIFIED");
 
   const stations = [
     {
       num: 1,
       name: "Message",
-      sub: "received",
       done: Boolean(selectedTicket),
       active: isRunning && !understoodEv,
-      detail: selectedTicket ? `${selectedTicket.channel} · ${timeAgo(selectedTicket.created_at)}` : "waiting...",
+      val: selectedTicket ? `WhatsApp · ${timeAgo(selectedTicket.created_at)}` : "",
     },
     {
       num: 2,
       name: "Sarvam",
-      sub: "proposed",
       done: Boolean(understoodEv),
       active: isRunning && !understoodEv,
-      detail: understoodEv
-        ? `${understoodEv.payload?.intent || "ANALYZED"} · Actor: ${understoodEv.actor}`
-        : "Proposes plan",
+      val: understoodEv ? `${understoodEv.payload?.intent || "ANALYZED"} · ${understoodEv.actor}` : "",
     },
     {
       num: 3,
       name: "Ledger",
-      sub: "read",
       done: Boolean(recalledEv || understoodEv),
       active: isRunning && understoodEv && !decidedEv,
-      detail: primarySettlement
-        ? `₹${primarySettlement.amount?.toLocaleString("en-IN")} · ${primarySettlement.status} · ${primarySettlement.retry_count}/2 retries`
-        : "Read SQLite ledger",
+      val: primarySettlement ? `₹${primarySettlement.amount?.toLocaleString("en-IN")} · ${primarySettlement.status}` : "",
     },
     {
       num: 4,
       name: "Policy",
-      sub: "decided",
       done: Boolean(decidedEv),
       active: isRunning && recalledEv && !decidedEv,
-      detail: decidedEv
-        ? decidedEv.payload?.explanation || decidedEv.reason_code || "Decision rendered"
-        : "Evaluate rules",
+      val: decidedEv ? `${decidedEv.payload?.action || decidedEv.reason_code}` : "",
     },
     {
       num: 5,
       name: "Action",
-      sub: "done",
-      done: Boolean(actedEv || notifiedEv),
+      done: Boolean(actedEv),
       active: isRunning && decidedEv && !actedEv,
-      detail: actedEv
-        ? `${actedEv.payload?.tool || "tool executed"} · ticket ${selectedTicket?.status}`
-        : "Execute write tools",
+      val: actedEv ? `${actedEv.payload?.tool || "tool executed"}` : "",
     },
   ];
 
@@ -473,24 +458,22 @@ export default function ResolveOS() {
       {/* ─── Top Bar (40px Paytm Navy #002970) ─────────────────────────────── */}
       <header className="h-[40px] shrink-0 bg-[#002970] border-b border-[#00BAF2]/30 flex items-center justify-between px-4 z-20">
         {/* Left: Brand */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-5 h-5 rounded bg-[#00BAF2] flex items-center justify-center font-black text-[11px] text-white shadow-sm">
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 rounded bg-[#00BAF2] flex items-center justify-center font-medium text-[11px] text-white">
             R
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-white font-bold text-sm tracking-tight">Resolve OS</span>
-            <span className="text-white/60 text-xs font-medium">Merchant Support</span>
-          </div>
+          <span className="text-white font-medium text-[14px] tracking-tight">Resolve OS</span>
+          <span className="text-white/70 text-xs font-normal">Merchant Support</span>
         </div>
 
         {/* Center: ONE PILL ONLY */}
         <div className="flex items-center">
           {health?.sarvam === "fixture" ? (
-            <span className="px-2.5 py-0.5 rounded text-[11px] font-mono font-semibold bg-red-500/20 text-red-300 border border-red-500/40 tracking-wider">
+            <span className="px-2 py-0.5 rounded text-[10px] font-medium tracking-[0.06em] uppercase bg-red-500/20 text-red-300 border border-red-500/40">
               SARVAM FIXTURE
             </span>
           ) : (
-            <span className="px-2.5 py-0.5 rounded text-[11px] font-mono font-semibold bg-amber-500/25 text-amber-300 border border-amber-500/40 tracking-wider">
+            <span className="px-2 py-0.5 rounded text-[10px] font-medium tracking-[0.06em] uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40">
               TEST DATA
             </span>
           )}
@@ -500,37 +483,37 @@ export default function ResolveOS() {
         <div className="flex items-center gap-3">
           <button
             onClick={handleReset}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white/90 bg-white/10 hover:bg-white/20 border border-white/20 rounded transition active:scale-95"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-white/80 hover:text-white bg-white/10 hover:bg-white/15 rounded transition"
             title="Reset SQLite database to initial seed data"
           >
             <RotateCcw className="w-3 h-3 text-[#00BAF2]" />
             <span>Reset demo</span>
           </button>
 
-          <div className="h-3.5 w-px bg-white/20" />
+          <div className="h-3 w-px bg-white/20" />
 
           {/* Health dots */}
-          <div className="flex items-center gap-2 text-[11px] text-white/70">
+          <div className="flex items-center gap-2 text-[11px] text-white/70 font-normal">
             <div className="flex items-center gap-1" title="SQLite Database">
-              <span className={`w-2 h-2 rounded-full ${apiError ? "bg-red-500 animate-pulse" : "bg-emerald-400"}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${apiError ? "bg-red-500" : "bg-emerald-400"}`} />
               <span className="hidden sm:inline">API</span>
             </div>
             <div className="flex items-center gap-1" title={health?.sarvam === "live" ? "Sarvam 105B Live" : "Sarvam Fixture"}>
-              <span className={`w-2 h-2 rounded-full ${health?.sarvam === "live" ? "bg-emerald-400" : "bg-amber-400"}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${health?.sarvam === "live" ? "bg-emerald-400" : "bg-amber-400"}`} />
               <span className="hidden sm:inline">Sarvam</span>
             </div>
             <div className="flex items-center gap-1" title="Meta WhatsApp Cloud API">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               <span className="hidden sm:inline">WhatsApp</span>
             </div>
           </div>
 
-          <div className="h-3.5 w-px bg-white/20" />
+          <div className="h-3 w-px bg-white/20" />
 
           <button
             onClick={() => setShowArchPopover(!showArchPopover)}
-            className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition"
-            title="How Resolve OS Works"
+            className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition"
+            title="Architecture"
           >
             <HelpCircle className="w-3.5 h-3.5" />
           </button>
@@ -540,66 +523,22 @@ export default function ResolveOS() {
       {/* ─── Architecture Popover ────────────────────────────────────────── */}
       {showArchPopover && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-lg shadow-2xl border border-slate-200 max-w-xl w-full p-5 space-y-4 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded bg-[#002970] text-white flex items-center justify-center font-bold text-xs">
-                  R
-                </div>
-                <h3 className="font-bold text-[#002970] text-base">Resolve OS Architecture</h3>
-              </div>
+          <div className="bg-white rounded-lg shadow-xl border border-slate-200 max-w-md w-full p-5 space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h3 className="font-medium text-[#002970] text-sm">Resolve OS Architecture</h3>
               <button onClick={() => setShowArchPopover(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded font-mono text-xs text-slate-800 leading-relaxed font-semibold">
+            <p className="text-xs text-slate-800 font-medium bg-slate-50 p-2.5 rounded border border-slate-200">
               Hinglish ticket in → Sarvam proposes → rules read the ledger → one of three endings → audit.
-            </div>
-            <div className="space-y-2 text-xs text-slate-600 leading-normal">
-              <p>
-                <strong>1. Inbound Ingestion:</strong> WhatsApp Cloud API or Desk catches exact merchant Hinglish complaint.
-              </p>
-              <p>
-                <strong>2. Sarvam 105B Planner:</strong> Identifies intent and proposes structured actions. Proposes only — model never touches ledger funds.
-              </p>
-              <p>
-                <strong>3. Deterministic Policy:</strong> Pure Python policy enforces Paytm thresholds (≤ ₹50k, 0 AML flags, &lt; 2 retries, UTR match).
-              </p>
-              <p>
-                <strong>4. Three Distinct Endings:</strong>
-                <span className="block text-emerald-700 font-semibold">• RESOLVED: Retry pushed on bank file with generated UTR.</span>
-                <span className="block text-amber-700 font-semibold">• WAITING: Asks merchant for 12-digit UTR (no money moved).</span>
-                <span className="block text-red-700 font-semibold">• ESCALATED: Account freeze / high-value handed to Risk Ops human brief.</span>
-              </p>
-              <p>
-                <strong>5. Full Audit Ledger:</strong> Every tool execution, WhatsApp outbox dispatch, and token recorded in SQLite.
-              </p>
-            </div>
-            <div className="text-right pt-2 border-t border-slate-100">
-              <button
-                onClick={() => setShowArchPopover(false)}
-                className="px-4 py-1.5 bg-[#002970] text-white rounded text-xs font-semibold hover:bg-[#001f56]"
-              >
-                Close
-              </button>
+            </p>
+            <div className="text-xs text-slate-600 space-y-1.5 leading-relaxed font-normal">
+              <p>• <strong>Sarvam 105B:</strong> Interprets Hinglish and proposes actions. Proposes only — model never touches funds.</p>
+              <p>• <strong>Deterministic Policy:</strong> Zero-LLM hard rules enforce Paytm caps (≤ ₹50k, 0 AML flags, &lt; 2 retries).</p>
+              <p>• <strong>Three Endings:</strong> RESOLVED (pushed retry), WAITING (asks UTR), ESCALATED (Risk Ops brief).</p>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ─── API Offline Notice ──────────────────────────────────────────── */}
-      {apiError && (
-        <div className="bg-red-600 text-white px-4 py-1.5 text-xs flex items-center justify-between shrink-0 font-medium">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>Cannot reach backend API at <code>{getApiUrl("")}</code>. Ensure FastAPI server is running on port 8000.</span>
-          </div>
-          <button
-            onClick={() => { fetchHealth(); fetchTickets(); }}
-            className="underline text-white font-bold hover:text-white/80"
-          >
-            Retry
-          </button>
         </div>
       )}
 
@@ -608,22 +547,22 @@ export default function ResolveOS() {
         {/* ═══════════════════════════════════════════════════════════════════
             COLUMN 1: Queue (280px fixed width)
             ═══════════════════════════════════════════════════════════════════ */}
-        <aside className="w-[280px] shrink-0 bg-white border-r border-slate-200 flex flex-col h-full overflow-hidden">
-          {/* Queue Header */}
-          <div className="p-3 border-b border-slate-100 flex items-center justify-between shrink-0">
-            <span className="font-bold text-sm text-[#002970] tracking-tight">Queue</span>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#002970]/10 text-[#002970]">
-              {heroOpenCount} OPEN
+        <aside className="w-[280px] shrink-0 bg-white border-r border-[#E5E7EB] flex flex-col h-full overflow-hidden">
+          {/* Header */}
+          <div className="p-3 border-b border-[#E5E7EB] flex items-center justify-between shrink-0">
+            <span className="font-medium text-[13px] text-[#002970]">Queue</span>
+            <span className="text-[11px] font-normal text-slate-500">
+              {heroOpenCount} open
             </span>
           </div>
 
-          {/* Queue Tabs */}
-          <div className="flex border-b border-slate-200 bg-slate-50 text-xs shrink-0 font-medium">
+          {/* Tabs */}
+          <div className="flex border-b border-[#E5E7EB] bg-slate-50 text-xs shrink-0 font-medium">
             <button
               onClick={() => setActiveTab("hero")}
               className={`flex-1 py-2 text-center transition ${
                 activeTab === "hero"
-                  ? "bg-white text-[#002970] font-bold border-b-2 border-[#00BAF2] shadow-sm"
+                  ? "bg-white text-[#002970] font-medium border-b-2 border-[#00BAF2]"
                   : "text-slate-500 hover:text-slate-800"
               }`}
             >
@@ -633,7 +572,7 @@ export default function ResolveOS() {
               onClick={() => setActiveTab("whatsapp")}
               className={`flex-1 py-2 text-center transition ${
                 activeTab === "whatsapp"
-                  ? "bg-white text-[#002970] font-bold border-b-2 border-[#00BAF2] shadow-sm"
+                  ? "bg-white text-[#002970] font-medium border-b-2 border-[#00BAF2]"
                   : "text-slate-500 hover:text-slate-800"
               }`}
             >
@@ -643,7 +582,7 @@ export default function ResolveOS() {
               onClick={() => setActiveTab("all")}
               className={`flex-1 py-2 text-center transition ${
                 activeTab === "all"
-                  ? "bg-white text-[#002970] font-bold border-b-2 border-[#00BAF2] shadow-sm"
+                  ? "bg-white text-[#002970] font-medium border-b-2 border-[#00BAF2]"
                   : "text-slate-500 hover:text-slate-800"
               }`}
             >
@@ -651,15 +590,14 @@ export default function ResolveOS() {
             </button>
           </div>
 
-          {/* Ticket List */}
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+          {/* List */}
+          <div className="flex-1 overflow-y-auto divide-y divide-[#E5E7EB]">
             {loading ? (
               <div className="p-4 space-y-3">
                 {[1, 2, 3].map((n) => (
                   <div key={n} className="animate-pulse space-y-2">
-                    <div className="h-3.5 bg-slate-200 rounded w-20" />
-                    <div className="h-4 bg-slate-200 rounded w-44" />
-                    <div className="h-3 bg-slate-100 rounded w-full" />
+                    <div className="h-3 bg-slate-200 rounded w-16" />
+                    <div className="h-3.5 bg-slate-200 rounded w-36" />
                   </div>
                 ))}
               </div>
@@ -670,29 +608,23 @@ export default function ResolveOS() {
             ) : (
               filteredTickets.map((ticket) => {
                 const isSelected = ticket.id === selectedId;
-                const isSharmaSettledContradiction =
-                  ticket.id === "T-1042" &&
-                  ticket.status === "OPEN" &&
-                  primarySettlement?.status === "SUCCESS";
 
                 return (
                   <button
                     key={ticket.id}
                     onClick={() => setSelectedId(ticket.id)}
-                    className={`w-full text-left p-3 transition relative flex flex-col gap-1 ${
+                    className={`w-full text-left p-3 transition flex flex-col gap-1 ${
                       isSelected
                         ? "bg-[#00BAF2]/5 border-l-[3px] border-l-[#00BAF2]"
-                        : "hover:bg-slate-50/80 border-l-[3px] border-l-transparent"
+                        : "hover:bg-slate-50 border-l-[3px] border-l-transparent"
                     }`}
                   >
-                    {/* Row 1: ID + Status chip */}
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold text-slate-900 tracking-tight">
+                      <span className="text-xs font-medium text-slate-900 font-mono">
                         {ticket.id}
                       </span>
-                      {/* Status chip */}
                       <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+                        className={`text-[10px] font-medium px-1.5 py-0.2 rounded uppercase ${
                           ticket.status === "OPEN"
                             ? "border border-[#002970] text-[#002970]"
                             : ticket.status === "RESOLVED"
@@ -706,36 +638,22 @@ export default function ResolveOS() {
                       </span>
                     </div>
 
-                    {/* Row 2: Merchant name · Amount */}
-                    <div className="text-xs font-semibold text-slate-800 truncate">
+                    <div className="text-[13px] font-medium text-slate-800 truncate">
                       {ticket.merchant_name} ·{" "}
-                      <span className="font-bold text-[#002970]">
-                        {formatRupees(ticket.amount)}
-                      </span>
+                      <span className="text-[#002970]">{formatRupees(ticket.amount)}</span>
                     </div>
 
-                    {/* Row 3: Hinglish snippet */}
-                    <div className="text-[11px] text-slate-500 italic line-clamp-1">
+                    <div className="text-xs font-normal text-slate-500 truncate">
                       &ldquo;{ticket.text}&rdquo;
                     </div>
 
-                    {/* Row 4: Channel · Time */}
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 mt-0.5">
+                    <div className="flex items-center justify-between text-[10px] font-medium text-slate-400 mt-0.5 tracking-[0.04em]">
                       <span>{ticket.channel}</span>
                       <span>{timeAgo(ticket.created_at)}</span>
                     </div>
 
-                    {/* Row Warning Chip for Contradiction Bug */}
-                    {isSharmaSettledContradiction && (
-                      <div className="mt-1 bg-red-100 border border-red-300 text-red-800 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3 text-red-600 shrink-0" />
-                        <span>LEDGER ALREADY SETTLED — reset</span>
-                      </div>
-                    )}
-
-                    {/* WhatsApp Live mapping explanation */}
                     {activeTab === "whatsapp" && (
-                      <div className="text-[10px] text-[#00BAF2] font-medium mt-0.5">
+                      <div className="text-[10px] font-medium text-[#00BAF2] mt-0.5">
                         {ticket.text.toLowerCase().includes("refund") || ticket.amount === 850
                           ? "mapped by keyword “refund” → Glow"
                           : ticket.text.toLowerCase().includes("freeze") || ticket.amount === 184000
@@ -751,10 +669,10 @@ export default function ResolveOS() {
             )}
           </div>
 
-          {/* Inbound Simulator Composer (on WhatsApp tab) */}
+          {/* Inbound Simulator (on WhatsApp tab) */}
           {activeTab === "whatsapp" && (
-            <div className="p-3 border-t border-slate-200 bg-slate-50 shrink-0">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+            <div className="p-3 border-t border-[#E5E7EB] bg-slate-50 shrink-0">
+              <span className="text-[10px] font-medium tracking-[0.06em] text-[#6B7280] uppercase block mb-1.5">
                 Simulate Inbound WhatsApp
               </span>
               <form onSubmit={handleSimulateInbound} className="flex gap-1.5">
@@ -768,7 +686,7 @@ export default function ResolveOS() {
                 <button
                   type="submit"
                   disabled={simSending || !simText.trim()}
-                  className="px-2.5 py-1 bg-[#002970] text-white rounded text-xs font-semibold hover:bg-[#001f56] disabled:opacity-50"
+                  className="px-2.5 py-1 bg-[#002970] text-white rounded text-xs font-medium hover:bg-[#001f56] disabled:opacity-50"
                 >
                   <Send className="w-3 h-3" />
                 </button>
@@ -782,16 +700,16 @@ export default function ResolveOS() {
             ═══════════════════════════════════════════════════════════════════ */}
         <main className="flex-1 flex flex-col min-w-0 bg-[#F5F7FB] overflow-y-auto">
           {selectedTicket ? (
-            <div className="p-5 max-w-4xl w-full mx-auto space-y-4">
+            <div className="p-6 max-w-4xl w-full mx-auto space-y-4">
               {/* 3a. Case Header */}
-              <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h1 className="font-mono font-black text-lg text-[#002970]">
+              <div className="bg-white rounded-lg border border-[#E5E7EB] p-4 flex items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[20px] font-medium text-[#002970] font-mono">
                       {selectedTicket.id}
-                    </h1>
-                    <span className="text-slate-400">·</span>
-                    <span className="font-bold text-base text-slate-800">
+                    </span>
+                    <span className="text-slate-300">·</span>
+                    <span className="text-base font-medium text-slate-800">
                       {selectedTicket.id === "T-1042"
                         ? "Settlement missing"
                         : selectedTicket.id === "T-1048"
@@ -801,46 +719,34 @@ export default function ResolveOS() {
                         : selectedTicket.intent || "Merchant Operations Dispute"}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
-                    <span>{detail?.merchant?.name || selectedTicket.merchant_name}</span>
-                    <span>·</span>
-                    <span>{detail?.merchant?.city || selectedTicket.merchant_city || "Delhi NCR"}</span>
-                    <span>·</span>
-                    <span className="font-mono text-slate-500">{selectedTicket.merchant_id}</span>
-                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-[10px]">
-                      Channel: {selectedTicket.channel}
-                    </span>
+                  <div className="text-xs font-normal text-slate-500 mt-0.5">
+                    {detail?.merchant?.name || selectedTicket.merchant_name} · {detail?.merchant?.city || selectedTicket.merchant_city || "Delhi NCR"} · {selectedTicket.merchant_id}
                   </div>
                 </div>
 
-                {/* Primary Run Resolve OS Button */}
+                {/* Primary Run Button */}
                 <div>
                   {cannotAutoRetry ? (
-                    <div className="text-right">
-                      <button
-                        disabled
-                        className="px-4 py-2 rounded font-bold text-xs bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300 shadow-none"
-                      >
-                        [ Run Resolve OS ]
-                      </button>
-                      <p className="text-[11px] font-bold text-red-600 mt-1">
-                        Cannot auto-retry — ledger status is SUCCESS. Reset demo.
-                      </p>
-                    </div>
+                    <button
+                      disabled
+                      className="px-4 py-2 rounded text-xs font-medium bg-slate-200 text-slate-400 cursor-not-allowed"
+                    >
+                      Run Resolve OS
+                    </button>
                   ) : (
                     <button
                       onClick={handleRun}
                       disabled={isRunning}
-                      className="px-5 py-2.5 rounded font-bold text-xs bg-[#00BAF2] hover:bg-[#009ecc] text-white shadow-sm transition active:scale-95 flex items-center gap-2 disabled:opacity-75 disabled:cursor-wait"
+                      className="px-4 py-2 rounded text-xs font-medium bg-[#002970] hover:bg-[#001f56] text-white transition active:scale-95 flex items-center gap-2 disabled:opacity-75 disabled:cursor-wait"
                     >
                       {isRunning ? (
                         <>
                           <RotateCcw className="w-3.5 h-3.5 animate-spin" />
-                          <span>Running Resolve OS... ({elapsed.toFixed(1)}s)</span>
+                          <span>Running... ({elapsed.toFixed(1)}s)</span>
                         </>
                       ) : (
                         <>
-                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <Play className="w-3 h-3 fill-current" />
                           <span>Run Resolve OS</span>
                         </>
                       )}
@@ -849,78 +755,62 @@ export default function ResolveOS() {
                 </div>
               </div>
 
-              {/* 3b. Merchant Message (Always visible incoming WhatsApp bubble) */}
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block px-1">
-                  Merchant Complaint · Raw Unmodified Input
-                </span>
-                <div className="bg-white border border-slate-200 rounded-lg p-3.5 shadow-sm max-w-2xl">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
-                        <User className="w-3 h-3" />
-                      </div>
-                      <span className="text-xs font-bold text-slate-900">
-                        {detail?.merchant?.name || selectedTicket.merchant_name}
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-slate-400">
-                      WhatsApp Inbound · {timeAgo(selectedTicket.created_at)}
-                    </span>
-                  </div>
-                  <p className="text-sm text-slate-900 leading-relaxed font-normal">
-                    &ldquo;{selectedTicket.text}&rdquo;
-                  </p>
+              {/* 3b. Merchant Message (Clean bubble) */}
+              <div className="bg-white border border-[#E5E7EB] rounded-lg p-4 max-w-2xl">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 mb-2.5">
+                  <span className="text-xs font-medium text-slate-900">
+                    {detail?.merchant?.name || selectedTicket.merchant_name}
+                  </span>
+                  <span className="text-[11px] font-normal text-slate-400">
+                    WhatsApp · {timeAgo(selectedTicket.created_at)}
+                  </span>
                 </div>
+                <p className="text-[14px] font-normal text-slate-900 leading-relaxed">
+                  &ldquo;{selectedTicket.text}&rdquo;
+                </p>
               </div>
 
-              {/* 3c. Pipeline Strip — Five Stations */}
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block px-1">
-                  Autonomous Ops Lifecycle · Driven by /events
+              {/* 3c. Pipeline Strip (5 quiet stations) */}
+              <div className="space-y-1.5">
+                <span className="text-xs font-medium text-slate-700 block px-0.5">
+                  Pipeline
                 </span>
                 <div className="grid grid-cols-5 gap-2">
                   {stations.map((st) => (
                     <div
                       key={st.num}
-                      className={`p-2.5 rounded-lg border text-left transition flex flex-col justify-between min-h-[92px] ${
+                      className={`p-3 rounded-lg border text-left flex flex-col justify-between min-h-[76px] ${
                         st.active
-                          ? "bg-cyan-50/50 border-[#00BAF2] shadow-[0_0_12px_rgba(0,186,242,0.25)] animate-pulse"
+                          ? "bg-cyan-50/40 border-[#00BAF2] animate-pulse"
                           : st.done
-                          ? "bg-white border-slate-200 shadow-sm"
-                          : "bg-slate-50/60 border-slate-200 text-slate-400"
+                          ? "bg-white border-[#E5E7EB]"
+                          : "bg-slate-50/50 border-[#E5E7EB]"
                       }`}
                     >
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-mono font-bold text-slate-400">
-                            {st.num}
-                          </span>
-                          {st.done ? (
-                            <CheckCircle2 className="w-3.5 h-3.5 text-[#002970]" />
-                          ) : st.active ? (
-                            <span className="w-2 h-2 rounded-full bg-[#00BAF2] animate-ping" />
-                          ) : null}
-                        </div>
-                        <div className="text-xs font-bold text-slate-900 mt-0.5">{st.name}</div>
-                        <div className="text-[10px] text-slate-500 capitalize">{st.sub}</div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-slate-400 font-mono">
+                          {st.num}
+                        </span>
+                        {st.done && <Check className="w-3.5 h-3.5 text-[#002970]" />}
                       </div>
-
-                      <div className="text-[10px] text-slate-600 line-clamp-2 mt-1 leading-tight font-medium">
-                        {st.detail}
+                      <div className="text-xs font-medium text-slate-900 mt-1">
+                        {st.name}
+                      </div>
+                      <div className="text-[10px] font-normal text-slate-500 truncate mt-0.5">
+                        {st.val}
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* 3d. Outcome Banner (The slide they photograph) */}
+              {/* 3d. Outcome Banner (The photographable slide) */}
               {(selectedTicket.status === "RESOLVED" ||
                 selectedTicket.status === "WAITING_ON_MERCHANT" ||
                 selectedTicket.status === "WAITING" ||
                 selectedTicket.status === "ESCALATED") && (
                 <div
-                  className={`rounded-lg p-4 border-2 shadow-sm animate-in fade-in zoom-in-95 ${
+                  className={`rounded-lg p-5 border ${
                     selectedTicket.status === "RESOLVED"
                       ? "bg-emerald-50 border-emerald-500 text-emerald-950"
                       : selectedTicket.status === "WAITING_ON_MERCHANT" || selectedTicket.status === "WAITING"
@@ -928,23 +818,15 @@ export default function ResolveOS() {
                       : "bg-red-50 border-red-500 text-red-950"
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    {selectedTicket.status === "RESOLVED" && <CheckCircle2 className="w-6 h-6 text-emerald-600" />}
-                    {(selectedTicket.status === "WAITING_ON_MERCHANT" || selectedTicket.status === "WAITING") && (
-                      <AlertCircle className="w-6 h-6 text-amber-600" />
-                    )}
-                    {selectedTicket.status === "ESCALATED" && <ShieldAlert className="w-6 h-6 text-red-600" />}
-
-                    <h2 className="text-xl md:text-2xl font-black tracking-tight">
-                      {selectedTicket.status === "RESOLVED"
-                        ? "RESOLVED · RETRY ALLOWED"
-                        : selectedTicket.status === "WAITING_ON_MERCHANT" || selectedTicket.status === "WAITING"
-                        ? "WAITING ON MERCHANT · UTR REQUIRED"
-                        : "ESCALATED · RISK OPS REVIEW"}
-                    </h2>
+                  <div className="text-lg font-medium tracking-tight">
+                    {selectedTicket.status === "RESOLVED"
+                      ? "RESOLVED · RETRY ALLOWED"
+                      : selectedTicket.status === "WAITING_ON_MERCHANT" || selectedTicket.status === "WAITING"
+                      ? "WAITING ON MERCHANT · UTR REQUIRED"
+                      : "ESCALATED · RISK OPS REVIEW"}
                   </div>
 
-                  <p className="mt-1.5 text-sm md:text-base font-semibold opacity-90 pl-8">
+                  <p className="mt-1 text-sm font-normal opacity-90">
                     {selectedTicket.status === "RESOLVED" &&
                       `Retry allowed on test ledger. ${formatRupees(
                         primarySettlement?.amount || selectedTicket.amount
@@ -959,25 +841,21 @@ export default function ResolveOS() {
                 </div>
               )}
 
-              {/* 3e. Outbound WhatsApp Message Bubble */}
+              {/* 3e. Outbound WhatsApp */}
               {detail?.latest_whatsapp && (
-                <div className="flex flex-col items-end space-y-1">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block px-1">
-                    Outbound WhatsApp Notification
-                  </span>
-                  <div className="bg-[#DCF8C6] border border-emerald-300 text-slate-900 rounded-lg p-3.5 shadow-sm max-w-2xl">
-                    <div className="flex items-center justify-between border-b border-emerald-200/60 pb-1.5 mb-2 gap-4">
-                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded flex items-center gap-1">
-                        <Check className="w-3 h-3" /> TEMPLATE · allowlisted
+                <div className="flex flex-col items-end">
+                  <div className="bg-[#DCF8C6] border border-emerald-200 text-slate-900 rounded-lg p-4 max-w-2xl">
+                    <div className="flex items-center justify-between border-b border-emerald-200/50 pb-1 mb-2 gap-4">
+                      <span className="text-[10px] font-medium tracking-[0.06em] text-emerald-800 uppercase">
+                        TEMPLATE · allowlisted
                       </span>
-                      <span className="text-[10px] text-emerald-800">
-                        {detail.latest_whatsapp.created_at ? timeAgo(detail.latest_whatsapp.created_at) : "sent"}
+                      <span className="text-[11px] font-normal text-emerald-700">
+                        {timeAgo(detail.latest_whatsapp.created_at)}
                       </span>
                     </div>
-                    <p className="text-sm leading-relaxed">{detail.latest_whatsapp.body}</p>
-                    <div className="text-[10px] text-emerald-700/80 text-right mt-1.5 font-medium">
-                      Meta Cloud API: delivered (or saved to outbox only)
-                    </div>
+                    <p className="text-[14px] font-normal leading-relaxed text-slate-900">
+                      {detail.latest_whatsapp.body}
+                    </p>
                   </div>
                 </div>
               )}
@@ -990,61 +868,55 @@ export default function ResolveOS() {
         </main>
 
         {/* ═══════════════════════════════════════════════════════════════════
-            COLUMN 3: Context Rail (320px fixed width - Ledger is the lock)
+            COLUMN 3: Context Rail (320px fixed width)
             ═══════════════════════════════════════════════════════════════════ */}
-        <aside className="w-[320px] shrink-0 bg-white border-l border-slate-200 flex flex-col h-full overflow-y-auto p-4 space-y-4">
-          {/* Card 1: Risk Ops Brief (JUMPS TO THE TOP IF ESCALATED) */}
+        <aside className="w-[320px] shrink-0 bg-white border-l border-[#E5E7EB] flex flex-col h-full overflow-y-auto p-4 space-y-4">
+          {/* Card 1: Risk Ops Brief (JUMPS TO TOP IF ESCALATED) */}
           {detail?.human_brief && selectedTicket?.status === "ESCALATED" && (
-            <div className="bg-red-50/80 border border-red-300 rounded-lg p-3 space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-red-900 flex items-center gap-1 text-[11px] uppercase tracking-wider">
-                  <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
-                  Risk Ops brief
-                </span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-200 text-red-900 font-bold">
-                  Queue: {detail.human_brief.queue}
-                </span>
-              </div>
-              <pre className="text-[11px] font-sans text-red-950 whitespace-pre-wrap leading-relaxed">
+            <div className="bg-red-50/80 border border-red-200 rounded-lg p-3 space-y-2">
+              <span className="text-[10px] font-medium tracking-[0.06em] uppercase text-red-700 block">
+                Risk Ops brief
+              </span>
+              <pre className="text-xs font-sans text-red-950 whitespace-pre-wrap leading-relaxed font-normal">
                 {detail.human_brief.brief_text}
               </pre>
             </div>
           )}
 
-          {/* Card 2: Ledger Card — FIRST, ALWAYS */}
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2 text-xs">
+          {/* Card 2: Settlement Ledger (FIRST, ALWAYS) */}
+          <div className="bg-slate-50 border border-[#E5E7EB] rounded-lg p-3.5 space-y-2">
             <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
-              <span className="font-bold text-[#002970] text-xs uppercase tracking-wider">
-                Settlement Ledger
+              <span className="text-[10px] font-medium tracking-[0.06em] uppercase text-[#6B7280]">
+                SETTLEMENT
               </span>
-              <span className="text-[10px] font-mono text-slate-500 font-semibold">
+              <span className="text-[10px] font-medium text-slate-400">
                 Source: SQLite · TEST DATA
               </span>
             </div>
 
-            {/* Contradiction Warning on Card */}
+            {/* SINGLE Warning Banner */}
             {isContradiction && (
-              <div className="p-2 bg-red-100 border border-red-300 rounded text-red-900 font-bold text-[11px] leading-tight">
-                ⚠️ Already settled in test DB (Status: SUCCESS). Reset demo before running.
+              <div className="p-2 bg-red-100/90 border border-red-300 rounded text-red-900 font-medium text-xs">
+                Already settled in test DB · reset demo
               </div>
             )}
 
             {primarySettlement ? (
-              <div className="space-y-1.5 font-mono text-[11px]">
+              <div className="space-y-1.5 text-xs font-normal">
                 <div className="flex justify-between py-0.5 border-b border-slate-200/50">
-                  <span className="text-slate-500">Batch:</span>
-                  <span className="font-bold text-slate-900">{primarySettlement.id}</span>
+                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">BATCH</span>
+                  <span className="font-mono text-slate-900">{primarySettlement.id}</span>
                 </div>
-                <div className="flex justify-between py-0.5 border-b border-slate-200/50">
-                  <span className="text-slate-500 font-sans font-medium">Amount:</span>
-                  <span className="font-bold text-[#002970] bg-[#00BAF2]/10 px-1 rounded">
+                <div className="flex justify-between py-0.5 border-b border-slate-200/50 items-center">
+                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">AMOUNT</span>
+                  <span className="text-sm font-medium text-[#002970]">
                     {formatRupees(primarySettlement.amount)}
                   </span>
                 </div>
                 <div className="flex justify-between py-0.5 border-b border-slate-200/50">
-                  <span className="text-slate-500">Status:</span>
+                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">STATUS</span>
                   <span
-                    className={`font-bold uppercase ${
+                    className={`font-medium ${
                       primarySettlement.status === "SUCCESS"
                         ? "text-emerald-700"
                         : primarySettlement.status === "FAILED"
@@ -1056,171 +928,112 @@ export default function ResolveOS() {
                   </span>
                 </div>
                 <div className="flex justify-between py-0.5 border-b border-slate-200/50">
-                  <span className="text-slate-500">Retries:</span>
-                  <span className="font-bold text-slate-800">{primarySettlement.retry_count} / 2</span>
+                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">RETRIES</span>
+                  <span className="text-slate-800">{primarySettlement.retry_count} / 2</span>
                 </div>
                 <div className="flex justify-between py-0.5 border-b border-slate-200/50">
-                  <span className="text-slate-500">UTR:</span>
-                  <span className="text-slate-800 font-semibold">{primarySettlement.utr || "—"}</span>
-                </div>
-                <div className="flex justify-between py-0.5 border-b border-slate-200/50">
-                  <span className="text-slate-500">Freeze:</span>
-                  <span className={`font-bold ${primarySettlement.reason?.includes("FROZEN") ? "text-red-600" : "text-slate-700"}`}>
-                    {primarySettlement.reason?.includes("FROZEN") ? "YES (AML SUSPECT)" : "No"}
-                  </span>
+                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">UTR</span>
+                  <span className="font-mono text-slate-800">{primarySettlement.utr || "—"}</span>
                 </div>
                 <div className="flex justify-between py-0.5">
-                  <span className="text-slate-500">Risk code:</span>
-                  <span className="text-slate-700 truncate max-w-[170px]">{primarySettlement.reason || "—"}</span>
+                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">FREEZE</span>
+                  <span className={primarySettlement.reason?.includes("FROZEN") ? "text-red-600 font-medium" : "text-slate-700"}>
+                    {primarySettlement.reason?.includes("FROZEN") ? "YES · AML" : "No"}
+                  </span>
                 </div>
               </div>
             ) : (
-              <div className="text-slate-500 py-2 text-center text-xs">
+              <div className="text-slate-400 py-2 text-center text-xs">
                 No active settlement batch in DB.
               </div>
             )}
           </div>
 
-          {/* Card 3: Judge Control (Stage Demo Tools) */}
-          <div className="bg-white border border-slate-300 rounded-lg p-3 space-y-2.5 text-xs shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-[#002970] text-xs uppercase tracking-wider flex items-center gap-1">
-                <Sliders className="w-3.5 h-3.5 text-[#00BAF2]" />
-                Demo Tools · Stage Controls
+          {/* Card 3: Policy Verification (Only visible after run) */}
+          {decidedEv && (
+            <div className="bg-slate-50 border border-[#E5E7EB] rounded-lg p-3.5 space-y-2">
+              <span className="text-[10px] font-medium tracking-[0.06em] uppercase text-[#6B7280] block border-b border-slate-200 pb-1">
+                POLICY CHECKS
               </span>
-            </div>
-            <p className="text-[10px] text-slate-500 leading-tight">
-              Flip Sharma amount to ₹200k or toggle Delhi freeze live on stage without SQL.
-            </p>
 
-            <div className="space-y-2 pt-1">
-              {/* Amount override input */}
-              <div className="flex gap-1.5">
-                <input
-                  type="number"
-                  value={customAmount}
-                  onChange={(e) => setCustomAmount(e.target.value)}
-                  placeholder="200000"
-                  className="flex-1 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:border-[#00BAF2] font-mono"
-                />
-                <button
-                  onClick={handleSetAmount}
-                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded text-xs font-semibold"
-                >
-                  Set Amount
-                </button>
+              <div className="space-y-1 text-xs font-normal">
+                <div>
+                  {primarySettlement && primarySettlement.amount < 50000 ? (
+                    <span className="text-emerald-700">✓ amount &lt; ₹50,000</span>
+                  ) : (
+                    <span className="text-red-700">✗ amount ≥ ₹50,000</span>
+                  )}
+                </div>
+                <div>
+                  {primarySettlement && primarySettlement.status === "INITIATED" ? (
+                    <span className="text-emerald-700">✓ status INITIATED</span>
+                  ) : primarySettlement?.status === "SUCCESS" ? (
+                    <span className="text-red-700">✗ status is SUCCESS</span>
+                  ) : (
+                    <span className="text-slate-600">status: {primarySettlement?.status || "—"}</span>
+                  )}
+                </div>
+                <div>
+                  {primarySettlement && primarySettlement.retry_count < 2 ? (
+                    <span className="text-emerald-700">✓ retries &lt; 2</span>
+                  ) : (
+                    <span className="text-red-700">✗ retries exhausted</span>
+                  )}
+                </div>
+                <div>
+                  {detail?.merchant?.risk_flag || primarySettlement?.reason?.includes("FROZEN") ? (
+                    <span className="text-red-700">✗ active AML freeze flag</span>
+                  ) : (
+                    <span className="text-emerald-700">✓ no freeze / AML</span>
+                  )}
+                </div>
               </div>
 
-              {/* Toggle Freeze */}
-              <button
-                onClick={handleToggleFreeze}
-                className="w-full py-1.5 px-2.5 bg-red-50 hover:bg-red-100 text-red-800 border border-red-200 rounded font-semibold text-xs flex items-center justify-center gap-1.5 transition"
-              >
-                <ShieldAlert className="w-3 h-3" />
-                <span>Toggle Freeze / AML</span>
-              </button>
-
-              {/* Reset This Merchant */}
-              <button
-                onClick={handleResetMerchant}
-                className="w-full py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-medium text-xs flex items-center justify-center gap-1.5 transition"
-              >
-                <RotateCcw className="w-3 h-3 text-slate-500" />
-                <span>Reset This Merchant</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Card 4: Policy Verification Readout */}
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2 text-xs">
-            <span className="font-bold text-[#002970] text-xs uppercase tracking-wider block border-b border-slate-200 pb-1">
-              Policy Verification
-            </span>
-
-            {/* Checks Checklist */}
-            <div className="space-y-1 font-mono text-[11px]">
-              <div className="flex items-center gap-1.5">
-                {primarySettlement && primarySettlement.amount < 50000 ? (
-                  <span className="text-emerald-700 font-bold">✓ amount &lt; ₹50,000</span>
-                ) : (
-                  <span className="text-red-700 font-bold">✗ amount ≥ ₹50,000 (limit exceeded)</span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                {primarySettlement && primarySettlement.status === "INITIATED" ? (
-                  <span className="text-emerald-700 font-bold">✓ status INITIATED</span>
-                ) : primarySettlement?.status === "SUCCESS" ? (
-                  <span className="text-red-700 font-bold">✗ status SUCCESS (already paid)</span>
-                ) : (
-                  <span className="text-slate-600">status: {primarySettlement?.status || "—"}</span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                {primarySettlement && primarySettlement.retry_count < 2 ? (
-                  <span className="text-emerald-700 font-bold">✓ retries &lt; 2</span>
-                ) : (
-                  <span className="text-red-700 font-bold">✗ retries exhausted</span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                {detail?.merchant?.risk_flag || primarySettlement?.reason?.includes("FROZEN") ? (
-                  <span className="text-red-700 font-bold">✗ active AML freeze flag</span>
-                ) : (
-                  <span className="text-emerald-700 font-bold">✓ no freeze / AML flags</span>
-                )}
-              </div>
-            </div>
-
-            {/* Result Arrow */}
-            {decidedEv && (
-              <div className="pt-1.5 border-t border-slate-200 font-bold text-xs">
+              <div className="pt-1.5 border-t border-slate-200 text-xs font-medium">
                 {decidedEv.payload?.action === "retry_settlement_file" ? (
-                  <span className="text-emerald-700">→ ALLOW retry on ledger</span>
+                  <span className="text-emerald-700">→ ALLOW retry</span>
                 ) : decidedEv.payload?.action === "ask_merchant_utr" ? (
-                  <span className="text-amber-700">→ ASK merchant for UTR</span>
+                  <span className="text-amber-700">→ ASK UTR</span>
                 ) : (
-                  <span className="text-red-700">→ ESCALATE to Risk Ops</span>
+                  <span className="text-red-700">→ ESCALATE</span>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Card 5: Audit Stream */}
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2 text-xs">
+          {/* Card 4: Audit Stream */}
+          <div className="bg-slate-50 border border-[#E5E7EB] rounded-lg p-3.5 space-y-2">
             <div className="flex items-center justify-between border-b border-slate-200 pb-1">
-              <span className="font-bold text-[#002970] text-xs uppercase tracking-wider">
-                Audit Stream
+              <span className="text-[10px] font-medium tracking-[0.06em] uppercase text-[#6B7280]">
+                AUDIT STREAM
               </span>
-              <span className="text-[10px] text-slate-500 font-mono">
-                {events.length} events
+              <span className="text-[10px] text-slate-400 font-mono">
+                {events.length}
               </span>
             </div>
 
             {events.length === 0 ? (
-              <div className="text-slate-400 py-3 text-center text-xs">
-                No audit events recorded yet. Click &quot;Run Resolve OS&quot;.
+              <div className="text-slate-400 py-2 text-center text-xs">
+                No events yet.
               </div>
             ) : (
-              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {events.map((ev) => {
                   const actorMeta = getActorLabel(ev.actor);
                   return (
-                    <div key={ev.id} className="text-[11px] font-sans border-b border-slate-100 pb-1.5">
+                    <div key={ev.id} className="text-xs border-b border-slate-200/50 pb-1">
                       <div className="flex items-center justify-between gap-1">
-                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${actorMeta.color}`}>
+                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-medium border ${actorMeta.color}`}>
                           {actorMeta.label}
                         </span>
                         <span className="text-[10px] font-mono text-slate-400">
                           {ev.ts ? ev.ts.slice(11, 19) : ""}
                         </span>
                       </div>
-                      <div className="font-semibold text-slate-900 mt-0.5">
+                      <div className="font-medium text-slate-800 text-[11px] mt-0.5">
                         {ev.type}
                         {ev.reason_code && (
-                          <span className="font-mono text-slate-600 font-normal ml-1">
+                          <span className="font-mono text-slate-500 font-normal ml-1">
                             · {ev.reason_code}
                           </span>
                         )}
@@ -1232,44 +1045,60 @@ export default function ResolveOS() {
             )}
           </div>
 
-          {/* Card 6: Merchant Profile Card */}
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5 text-xs">
-            <span className="font-bold text-[#002970] text-xs uppercase tracking-wider block border-b border-slate-200 pb-1">
-              Merchant Profile
-            </span>
-            <div className="text-slate-800 font-semibold">
-              {detail?.merchant?.name || selectedTicket?.merchant_name}
-            </div>
-            <div className="text-[11px] text-slate-500">
-              {detail?.merchant?.city || "Delhi NCR"} · {detail?.merchant?.category || "Merchant Partner"}
-            </div>
-            <div className="flex gap-2 pt-1 text-[10px]">
-              <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded font-semibold">
-                QR: {detail?.merchant?.qr_status || "LIVE"}
-              </span>
-              <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded font-semibold">
-                Soundbox: {detail?.merchant?.soundbox_status || "ONLINE"}
-              </span>
-            </div>
+          {/* Card 5: Demo Tools (Collapsed behind toggle) */}
+          <div className="border border-[#E5E7EB] rounded-lg bg-white overflow-hidden">
+            <button
+              onClick={() => setDemoToolsOpen(!demoToolsOpen)}
+              className="w-full p-3 text-left flex items-center justify-between text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
+            >
+              <span>Demo tools</span>
+              {demoToolsOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            </button>
+
+            {demoToolsOpen && (
+              <div className="p-3 border-t border-[#E5E7EB] space-y-2 bg-slate-50/50">
+                <div className="flex gap-1.5">
+                  <input
+                    type="number"
+                    value={customAmount}
+                    onChange={(e) => setCustomAmount(e.target.value)}
+                    placeholder="200000"
+                    className="flex-1 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:border-[#00BAF2] font-mono"
+                  />
+                  <button
+                    onClick={handleSetAmount}
+                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded text-xs font-medium"
+                  >
+                    Set
+                  </button>
+                </div>
+
+                <button
+                  onClick={handleToggleFreeze}
+                  className="w-full py-1 px-2 bg-red-50 hover:bg-red-100 text-red-800 border border-red-200 rounded text-xs font-medium transition"
+                >
+                  Toggle Freeze / AML
+                </button>
+
+                <button
+                  onClick={handleResetMerchant}
+                  className="w-full py-1 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-medium transition"
+                >
+                  Reset This Merchant
+                </button>
+              </div>
+            )}
           </div>
         </aside>
       </div>
 
       {/* ─── Toast Notifications ─────────────────────────────────────────── */}
       {toast && (
-        <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-2">
-          <div
-            className={`px-4 py-2.5 rounded-lg shadow-xl text-xs font-semibold flex items-center gap-2 border ${
-              toast.type === "success"
-                ? "bg-emerald-800 text-white border-emerald-700"
-                : toast.type === "error"
-                ? "bg-red-800 text-white border-red-700"
-                : "bg-slate-900 text-white border-slate-800"
-            }`}
-          >
-            {toast.type === "success" && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
-            {toast.type === "error" && <AlertCircle className="w-4 h-4 text-red-400" />}
-            {toast.type === "info" && <Info className="w-4 h-4 text-[#00BAF2]" />}
+        <div className="fixed bottom-4 right-4 z-50">
+          <div className="px-3.5 py-2 rounded-lg shadow-lg text-xs font-medium flex items-center gap-2 border bg-slate-900 text-white border-slate-800">
+            {toast.type === "success" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+            {toast.type === "error" && <AlertCircle className="w-3.5 h-3.5 text-red-400" />}
+            {toast.type === "info" && <Info className="w-3.5 h-3.5 text-[#00BAF2]" />}
             <span>{toast.msg}</span>
           </div>
         </div>
