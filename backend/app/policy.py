@@ -1,5 +1,5 @@
 """
-Deterministic Policy Engine for DESK.
+Deterministic Policy Engine for Resolve OS.
 Pure Python rules. No LLMs.
 Enforces Paytm operations risk guardrails.
 """

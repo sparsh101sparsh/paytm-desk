@@ -84,14 +84,14 @@ function getApiUrl(endpoint: string): string {
   return endpoint;
 }
 
-export default function DESKBoard() {
+export default function ResolveOSBoard() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedId, setSelectedId] = useState<string>("T-1042");
   const [filter, setFilter] = useState<string>("ALL");
   const [ticketDetail, setTicketDetail] = useState<TicketDetail | null>(null);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [isRunning, setIsRunning] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<string>("DESK");
+  const [activeTab, setActiveTab] = useState<string>("Resolve OS");
   const [showN8nModal, setShowN8nModal] = useState<boolean>(false);
   const [showGraphDrawer, setShowGraphDrawer] = useState<boolean>(false);
 
@@ -138,8 +138,8 @@ export default function DESKBoard() {
     }
   }, [selectedId]);
 
-  // Run DESK
-  const handleRunDESK = async () => {
+  // Run Resolve OS
+  const handleRunResolveOS = async () => {
     if (!selectedId || isRunning) return;
     setIsRunning(true);
     try {
@@ -151,7 +151,7 @@ export default function DESKBoard() {
         await loadTicketDetail(selectedId);
       }
     } catch (err) {
-      console.error("Error running DESK", err);
+      console.error("Error running Resolve OS", err);
     } finally {
       setIsRunning(false);
     }
@@ -263,12 +263,12 @@ export default function DESKBoard() {
                 Intelligence
               </div>
               <div
-                onClick={() => setActiveTab("DESK")}
+                onClick={() => setActiveTab("Resolve OS")}
                 className="px-5 py-2.5 text-sm font-semibold text-[#002970] bg-[#E6F8FE] border-l-[3px] border-[#00BAF2] flex items-center justify-between cursor-pointer"
               >
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-[#00BAF2]" />
-                  <span>DESK</span>
+                  <span>Resolve OS</span>
                 </div>
                 <span className="text-[10px] bg-[#00BAF2] text-white px-1.5 py-0.5 rounded font-bold">AI</span>
               </div>
@@ -403,7 +403,7 @@ export default function DESKBoard() {
                 </button>
 
                 <button
-                  onClick={handleRunDESK}
+                  onClick={handleRunResolveOS}
                   disabled={isRunning}
                   className={`px-5 py-2 rounded-lg text-xs font-semibold shadow-paytm transition flex items-center gap-2 cursor-pointer active:scale-95 ${
                     isRunning
@@ -413,10 +413,10 @@ export default function DESKBoard() {
                 >
                   <Play className={`w-3.5 h-3.5 ${isRunning ? "animate-spin" : "fill-white"}`} />
                   {isRunning
-                    ? "Running DESK..."
+                    ? "Running Resolve OS..."
                     : currentTicket?.status === "RESOLVED" || currentTicket?.status === "WAITING_ON_MERCHANT" || currentTicket?.status === "ESCALATED"
-                    ? "Re-run DESK"
-                    : "Run DESK"}
+                    ? "Re-run Resolve OS"
+                    : "Run Resolve OS"}
                 </button>
               </div>
             </div>
@@ -426,7 +426,7 @@ export default function DESKBoard() {
               {currentTicket?.status === "RESOLVED" && (
                 <div className="bg-[#E7F6EE] border border-[#b6e8cf] rounded-lg p-3 flex items-center gap-2.5 text-xs text-[#14804A] font-medium">
                   <CheckCircle2 className="w-4 h-4 text-[#14804A] shrink-0" />
-                  <span>closed autonomously by DESK · Settlement pushed & merchant notified via WhatsApp.</span>
+                  <span>closed autonomously by Resolve OS · Settlement pushed & merchant notified via WhatsApp.</span>
                 </div>
               )}
               {currentTicket?.status === "WAITING_ON_MERCHANT" && (
@@ -444,7 +444,7 @@ export default function DESKBoard() {
               {currentTicket?.status === "OPEN" && !isRunning && (
                 <div className="bg-white border border-[#E6EAF0] rounded-lg p-3 flex items-center gap-2.5 text-xs text-[#6B7289]">
                   <ArrowRight className="w-4 h-4 text-[#00BAF2] shrink-0" />
-                  <span>Ticket ready for processing. Click <strong className="text-[#002970]">Run DESK</strong> to evaluate.</span>
+                  <span>Ticket ready for processing. Click <strong className="text-[#002970]">Run Resolve OS</strong> to evaluate.</span>
                 </div>
               )}
               {isRunning && (
@@ -462,7 +462,7 @@ export default function DESKBoard() {
                   <Sparkles className="w-8 h-8 text-[#00BAF2] mb-2" />
                   <h3 className="text-sm font-bold text-[#002970]">Autonomous Teammate Stage</h3>
                   <p className="text-xs max-w-sm mt-1 text-[#6B7289]">
-                    Select a ticket from the queue and click <span className="font-semibold text-[#00BAF2]">Run DESK</span>.
+                    Select a ticket from the queue and click <span className="font-semibold text-[#00BAF2]">Run Resolve OS</span>.
                     Real Sarvam proposals, Cognee memory recall, Policy decisions, and n8n tool actions will execute here.
                   </p>
                 </div>
@@ -633,7 +633,7 @@ export default function DESKBoard() {
                     <p className="font-sans">{ticketDetail.latest_whatsapp.body}</p>
                     <div className="flex justify-end items-center gap-1 mt-1 text-[10px] text-[#557049]">
                       <span>{new Date(ticketDetail.latest_whatsapp.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      <span>· via DESK</span>
+                      <span>· via Resolve OS</span>
                     </div>
                   </div>
                 </div>
@@ -794,7 +794,7 @@ export default function DESKBoard() {
               <div className="flex items-center gap-2.5">
                 <Workflow className="w-5 h-5 text-[#FF6D5A]" />
                 <h3 className="text-sm font-bold text-[#002970]">
-                  n8n Workflow Execution Canvas: DESK — Merchant Ticket
+                  n8n Workflow Execution Canvas: Resolve OS — Merchant Ticket
                 </h3>
               </div>
               <button
@@ -811,13 +811,13 @@ export default function DESKBoard() {
                 <code className="bg-white px-1.5 py-0.5 rounded font-mono text-[#002970]">
                   n8n/desk-merchant-ticket.json
                 </code>
-                . Import it into a local n8n instance to watch nodes execute live. Node states here reflect what DESK ran during this ticket.
+                . Import it into a local n8n instance to watch nodes execute live. Node states here reflect what Resolve OS ran during this ticket.
               </div>
 
               {/* Node graph representation */}
               <div className="grid grid-cols-3 gap-4">
                 {[
-                  { name: "Webhook: Run DESK", type: "webhook", desc: "POST /desk/run with ticket_id", state: events.length > 0 ? "complete" : "ready" },
+                  { name: "Webhook: Run Resolve OS", type: "webhook", desc: "POST /desk/run with ticket_id", state: events.length > 0 ? "complete" : "ready" },
                   { name: "HTTP: Load Ticket & Merchant", type: "http", desc: "Fetch state from SQLite backend", state: events.length > 0 ? "complete" : "ready" },
                   { name: "HTTP: Sarvam 105b Planner", type: "http", desc: "POST https://api.sarvam.ai/v1/chat", state: sarvamEvent ? "complete" : "ready" },
                   { name: "HTTP: Cognee Recall", type: "http", desc: "Search merchant memory & past batches", state: cogneeEvent ? "complete" : "ready" },

@@ -1,5 +1,5 @@
 """
-FastAPI application for DESK — Paytm Intelligence Teammate.
+FastAPI application for Resolve OS — Merchant Support Teammate.
 Merchant support operations engine.
 "Sarvam proposes. Policy decides. n8n acts. Cognee remembers."
 """
@@ -28,7 +28,7 @@ from .tools import (
 
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "")
 
-app = FastAPI(title="DESK — Paytm Intelligence Teammate", version="1.0.0")
+app = FastAPI(title="Resolve OS — Merchant Support Teammate", version="1.0.0")
 
 
 app.add_middleware(
@@ -139,7 +139,7 @@ def get_ticket_events(ticket_id: str):
 @app.post("/api/tickets/{ticket_id}/run", response_model=RunResponse)
 def run_desk(ticket_id: str, request: Request = None, recipient_phone: Optional[str] = None):
     """
-    Runs the full DESK lifecycle:
+    Runs the full Resolve OS lifecycle:
     1. Check N8N_WEBHOOK_URL if external orchestrator is active
     2. Sarvam / Fixture planner (Intent & Plan proposal) -> Audit: UNDERSTOOD
     3. Cognee memory search -> Audit: RECALLED
@@ -374,7 +374,7 @@ async def receive_meta_whatsapp(request: Request):
     Event listener called by Meta WhatsApp Cloud API when a merchant sends a message.
     1. Extracts sender phone & message body
     2. Maps to Paytm merchant profile & creates ticket in SQLite
-    3. Runs autonomous DESK policy pipeline
+    3. Runs autonomous Resolve OS policy pipeline
     4. Automatically dispatches approved response via WhatsApp Cloud API
     """
     try:
@@ -440,7 +440,7 @@ async def receive_meta_whatsapp(request: Request):
     conn.commit()
     conn.close()
 
-    # Execute full DESK lifecycle, passing sender_phone so the reply goes back to their WhatsApp!
+    # Execute full Resolve OS lifecycle, passing sender_phone so the reply goes back to their WhatsApp!
     try:
         run_res = run_desk(ticket_id=ticket_id, request=None, recipient_phone=sender_phone)
         return {

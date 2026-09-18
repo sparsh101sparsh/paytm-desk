@@ -1,5 +1,5 @@
 """
-Pydantic schemas for DESK.
+Pydantic schemas for Resolve OS.
 Minimal, type-safe structures for API contracts and partner payloads.
 """
 from typing import List, Optional, Any, Dict

@@ -1,5 +1,5 @@
 {
-  "name": "DESK - Merchant Ticket Workflow",
+  "name": "Resolve OS - Merchant Ticket Workflow",
   "nodes": [
     {
       "parameters": {
@@ -9,7 +9,7 @@
         "options": {}
       },
       "id": "node-webhook",
-      "name": "Webhook: Run DESK",
+      "name": "Webhook: Run Resolve OS",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [
@@ -117,7 +117,7 @@
         "options": {}
       },
       "id": "node-response",
-      "name": "Respond to DESK UI",
+      "name": "Respond to Resolve OS UI",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
@@ -127,7 +127,7 @@
     }
   ],
   "connections": {
-    "Webhook: Run DESK": {
+    "Webhook: Run Resolve OS": {
       "main": [
         [
           {
@@ -175,21 +175,21 @@
       "main": [
         [
           {
-            "node": "Respond to DESK UI",
+            "node": "Respond to Resolve OS UI",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Respond to DESK UI",
+            "node": "Respond to Resolve OS UI",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Respond to DESK UI",
+            "node": "Respond to Resolve OS UI",
             "type": "main",
             "index": 0
           }

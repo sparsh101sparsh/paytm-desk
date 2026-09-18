@@ -1,5 +1,5 @@
 """
-DESK Policy Evaluation Script — 40 synthetic Hinglish tickets.
+Resolve OS Policy Evaluation Script — 40 synthetic Hinglish tickets.
 Runs entirely offline. No API key needed.
 Reports: correct decisions, wrong decisions, unsafe actions taken, accuracy %.
 
@@ -7,7 +7,7 @@ Usage:
   PYTHONPATH=. python backend/tests/eval_policy.py
 
 Expected output (for judges / on stage):
-  DESK Policy Eval — 40 synthetic Hinglish tickets
+  Resolve OS Policy Eval — 40 synthetic Hinglish tickets
   ─────────────────────────────────────────────────
   Correct decisions : 40 / 40  (100.0%)
   Wrong decisions   : 0
@@ -162,7 +162,7 @@ def run_eval():
     accuracy = correct / total * 100
     bar = "─" * 57
 
-    print(f"\nDESK Policy Eval — {total} synthetic Hinglish tickets")
+    print(f"\nResolve OS Policy Eval — {total} synthetic Hinglish tickets")
     print(bar)
     print(f"Correct decisions : {correct} / {total}  ({accuracy:.1f}%)")
     print(f"Wrong decisions   : {wrong}")

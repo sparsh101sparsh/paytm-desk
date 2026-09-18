@@ -1,4 +1,4 @@
-# DESK — Paytm Intelligence Teammate for Merchant Support
+# Resolve OS — Autonomous AI Teammate for Merchant Support
 
 > **Track:** Autonomous AI Teammates  
 > **Event:** Paytm ♥ AI Hackathon · Delhi · 19 September 2026  
@@ -8,9 +8,9 @@
 
 ---
 
-## What is DESK?
+## What is Resolve OS?
 
-DESK is an autonomous AI operations teammate built inside the **Paytm for Business** ecosystem. When a merchant sends a Hinglish WhatsApp message about a stuck settlement or missing refund, DESK reads it, checks whether acting is safe using fixed rules, and either fixes it, asks for missing info, or escalates to a human. The AI suggests. The rules decide. It never moves money on its own.
+Resolve OS is an autonomous AI operations teammate built inside the **Paytm for Business** ecosystem. When a merchant sends a Hinglish WhatsApp message about a stuck settlement or missing refund, Resolve OS reads it, checks whether acting is safe using fixed rules, and either fixes it, asks for missing info, or escalates to a human. The AI suggests. The rules decide. It never moves money on its own.
 
 ### Stack (Honest)
 
@@ -36,14 +36,14 @@ DESK is an autonomous AI operations teammate built inside the **Paytm for Busine
 | **T-1055** | Delhi Electronics (Nehru Place) | Settlement ₹1,84,000 + `ACCOUNT_FROZEN_SUSPECT` | `ESCALATE_RISK` | Zero retries, Ticket `ESCALATED`, 6-line brief dispatched to `RISK_OPS` |
 
 **Anti-Hardcoding Verification:**  
-Edit the settlement amount in SQLite for T-1042 to ₹60,000, run it again → DESK denies with `SETTLEMENT_RETRY_DENIED_AMOUNT` and escalates. Zero `if (ticketId === "T-1042")` anywhere in the codebase. The decision comes from data, not ticket ID.
+Edit the settlement amount in SQLite for T-1042 to ₹60,000, run it again → Resolve OS denies with `SETTLEMENT_RETRY_DENIED_AMOUNT` and escalates. Zero `if (ticketId === "T-1042")` anywhere in the codebase. The decision comes from data, not ticket ID.
 
 ---
 
 ## Policy Eval — 40 Synthetic Hinglish Tickets
 
 ```
-DESK Policy Eval — 40 synthetic Hinglish tickets
+Resolve OS Policy Eval — 40 synthetic Hinglish tickets
 ─────────────────────────────────────────────────────────
 Correct decisions : 40 / 40  (100.0%)
 Wrong decisions   : 0
@@ -106,7 +106,7 @@ Create a `.env` file (copy `.env.example`) and add your key:
 ```
 SARVAM_API_KEY=your_key_here
 ```
-Without a key, DESK falls back to a deterministic fixture planner — all 3 demo tickets still work.
+Without a key, Resolve OS falls back to a deterministic fixture planner — all 3 demo tickets still work.
 
 ---
 

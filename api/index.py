@@ -19,6 +19,7 @@ if not tmp_db.exists():
         except Exception:
             pass
     if not tmp_db.exists():
+        os.environ["RESOLVEOS_DB_PATH"] = str(tmp_db)
         os.environ["DESK_DB_PATH"] = str(tmp_db)
         os.environ["COGNEE_OPTIONAL"] = "1"
         try:
@@ -27,6 +28,7 @@ if not tmp_db.exists():
         except Exception as e:
             print("Seed error on cold start:", e)
 
+os.environ["RESOLVEOS_DB_PATH"] = str(tmp_db)
 os.environ["DESK_DB_PATH"] = str(tmp_db)
 os.environ["COGNEE_OPTIONAL"] = os.getenv("COGNEE_OPTIONAL", "1")
 
