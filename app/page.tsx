@@ -10,11 +10,11 @@ import {
   ChevronRight,
   ChevronDown,
   Check,
-  User,
   HelpCircle,
   Send,
   X,
   Info,
+  MessageSquare,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -124,10 +124,10 @@ function getActorLabel(actor: string) {
 
 export default function ResolveOS() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [selectedId, setSelectedId] = useState<string>("T-1042");
+  const [selectedId, setSelectedId] = useState<string>("");
   const [detail, setDetail] = useState<TicketDetail | null>(null);
   const [events, setEvents] = useState<AuditEvent[]>([]);
-  const [activeTab, setActiveTab] = useState<"hero" | "whatsapp" | "all">("hero");
+  const [fallbackLedger, setFallbackLedger] = useState<{ merchant: any; settlements: Settlement[] } | null>(null);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [isRunning, setIsRunning] = useState<boolean>(false);
@@ -180,7 +180,20 @@ export default function ResolveOS() {
     }
   }, []);
 
+  const fetchFallbackLedger = useCallback(async () => {
+    try {
+      const res = await fetch(getApiUrl("/api/demo/ledger"), { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setFallbackLedger(data);
+      }
+    } catch {
+      // Ignored
+    }
+  }, []);
+
   const fetchDetail = useCallback(async (ticketId: string) => {
+    if (!ticketId) return;
     try {
       const [dRes, eRes] = await Promise.all([
         fetch(getApiUrl(`/api/tickets/${ticketId}`), { cache: "no-store" }),
@@ -199,14 +212,42 @@ export default function ResolveOS() {
     }
   }, []);
 
+  // Poll tickets and health every 1.5s for instant updates
   useEffect(() => {
     fetchHealth();
     fetchTickets().then(() => setLoading(false));
-  }, [fetchHealth, fetchTickets]);
+    fetchFallbackLedger();
 
+    const interval = setInterval(() => {
+      fetchTickets();
+      fetchHealth();
+      fetchFallbackLedger();
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [fetchHealth, fetchTickets, fetchFallbackLedger]);
+
+  // Sync selection with available tickets
+  useEffect(() => {
+    if (tickets.length > 0) {
+      if (!selectedId || !tickets.some((t) => t.id === selectedId)) {
+        setSelectedId(tickets[0].id);
+      }
+    } else {
+      setSelectedId("");
+      setDetail(null);
+      setEvents([]);
+    }
+  }, [tickets, selectedId]);
+
+  // Keep detail & audit events updated for selected ticket
   useEffect(() => {
     if (selectedId) {
       fetchDetail(selectedId);
+      const pollTimer = setInterval(() => {
+        fetchDetail(selectedId);
+      }, 2000);
+      return () => clearInterval(pollTimer);
     }
   }, [selectedId, fetchDetail]);
 
@@ -215,17 +256,42 @@ export default function ResolveOS() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  // ─── Active Entities & Computed Values ─────────────────────────────────────
+
+  const selectedTicket = detail?.ticket || tickets.find((t) => t.id === selectedId) || null;
+
+  const primarySettlement =
+    detail?.settlements && detail.settlements.length > 0
+      ? detail.settlements[0]
+      : fallbackLedger?.settlements && fallbackLedger.settlements.length > 0
+      ? fallbackLedger.settlements[0]
+      : null;
+
+  const activeMerchant = detail?.merchant || fallbackLedger?.merchant;
+  const activeMerchantId = selectedTicket?.merchant_id || activeMerchant?.id || "m_me";
+
+  const isContradiction =
+    selectedTicket?.status === "OPEN" &&
+    primarySettlement?.status === "SUCCESS";
+
+  const cannotAutoRetry =
+    primarySettlement &&
+    primarySettlement.status === "SUCCESS" &&
+    selectedTicket?.status === "OPEN";
+
   // ─── Actions ───────────────────────────────────────────────────────────────
 
   const handleReset = async () => {
     try {
       const res = await fetch(getApiUrl("/api/demo/reset"), { method: "POST" });
       if (res.ok) {
-        showToast("success", "Demo reset to initial seed.");
-        await fetchTickets();
-        if (selectedId) await fetchDetail(selectedId);
+        showToast("success", "Demo reset: tickets cleared, test ledger ready.");
+        setSelectedId("");
+        setDetail(null);
+        setEvents([]);
+        await Promise.all([fetchTickets(), fetchFallbackLedger()]);
       } else {
-        showToast("error", "Reset failed — seed not loaded");
+        showToast("error", "Reset failed");
       }
     } catch {
       showToast("error", "Could not connect to backend to reset.");
@@ -242,7 +308,6 @@ export default function ResolveOS() {
       setElapsed((Date.now() - startTime) / 1000);
     }, 100);
 
-    // Poll events while running
     pollRef.current = setInterval(() => {
       fetch(getApiUrl(`/api/tickets/${selectedId}/events`))
         .then((r) => r.json())
@@ -255,7 +320,7 @@ export default function ResolveOS() {
         method: "POST",
       });
       if (res.ok) {
-        await Promise.all([fetchDetail(selectedId), fetchTickets()]);
+        await Promise.all([fetchDetail(selectedId), fetchTickets(), fetchFallbackLedger()]);
       } else {
         const err = await res.json().catch(() => ({ detail: "Run failed" }));
         showToast("error", err.detail || "Resolve OS run failed.");
@@ -268,22 +333,22 @@ export default function ResolveOS() {
       setIsRunning(false);
       fetchDetail(selectedId);
       fetchTickets();
+      fetchFallbackLedger();
     }
   };
 
   const handleSetAmount = async () => {
-    if (!detail?.ticket.merchant_id) return;
     try {
       const amt = parseFloat(customAmount);
       const res = await fetch(getApiUrl("/api/demo/set-amount"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ merchant_id: detail.ticket.merchant_id, amount: amt }),
+        body: JSON.stringify({ merchant_id: activeMerchantId, amount: amt }),
       });
       if (res.ok) {
         showToast("success", `Amount updated to ₹${amt.toLocaleString("en-IN")}`);
-        fetchDetail(selectedId);
-        fetchTickets();
+        if (selectedId) await fetchDetail(selectedId);
+        await Promise.all([fetchTickets(), fetchFallbackLedger()]);
       }
     } catch {
       showToast("error", "Failed to update amount.");
@@ -291,18 +356,17 @@ export default function ResolveOS() {
   };
 
   const handleToggleFreeze = async () => {
-    if (!detail?.ticket.merchant_id) return;
     try {
       const res = await fetch(getApiUrl("/api/demo/toggle-freeze"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ merchant_id: detail.ticket.merchant_id }),
+        body: JSON.stringify({ merchant_id: activeMerchantId }),
       });
       if (res.ok) {
         const data = await res.json();
         showToast("info", data.risk_flag ? "Risk flag set: AML_SUSPECT" : "Risk flag cleared: Normal");
-        fetchDetail(selectedId);
-        fetchTickets();
+        if (selectedId) await fetchDetail(selectedId);
+        await Promise.all([fetchTickets(), fetchFallbackLedger()]);
       }
     } catch {
       showToast("error", "Failed to toggle freeze.");
@@ -310,17 +374,16 @@ export default function ResolveOS() {
   };
 
   const handleResetMerchant = async () => {
-    if (!detail?.ticket.merchant_id) return;
     try {
       const res = await fetch(getApiUrl("/api/demo/reset-merchant"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ merchant_id: detail.ticket.merchant_id }),
+        body: JSON.stringify({ merchant_id: activeMerchantId }),
       });
       if (res.ok) {
-        showToast("success", `Reset ${detail.merchant?.name || "merchant"} to seed.`);
-        fetchDetail(selectedId);
-        fetchTickets();
+        showToast("success", `Active merchant ledger reset to initial state.`);
+        if (selectedId) await fetchDetail(selectedId);
+        await Promise.all([fetchTickets(), fetchFallbackLedger()]);
       }
     } catch {
       showToast("error", "Failed to reset merchant.");
@@ -345,10 +408,10 @@ export default function ResolveOS() {
                   value: {
                     messaging_product: "whatsapp",
                     metadata: { display_phone_number: "15552013457", phone_number_id: "1329851416876776" },
-                    contacts: [{ profile: { name: "Stage Tester" }, wa_id: "919876543210" }],
+                    contacts: [{ profile: { name: "Sparsh" }, wa_id: "919810012345" }],
                     messages: [
                       {
-                        from: "919876543210",
+                        from: "919810012345",
                         id: `wamid.sim_${Date.now()}`,
                         timestamp: String(Math.floor(Date.now() / 1000)),
                         text: { body: simText.trim() },
@@ -369,9 +432,9 @@ export default function ResolveOS() {
         await fetchTickets();
         if (data.ticket_id) {
           setSelectedId(data.ticket_id);
-          setActiveTab("whatsapp");
+          await fetchDetail(data.ticket_id);
         }
-        showToast("success", `Inbound message processed → ${data.ticket_id}`);
+        showToast("success", `Inbound WhatsApp message processed → ${data.ticket_id}`);
       }
     } catch {
       showToast("error", "Failed to send simulated inbound.");
@@ -379,34 +442,6 @@ export default function ResolveOS() {
       setSimSending(false);
     }
   };
-
-  // ─── Filtered Queues ───────────────────────────────────────────────────────
-
-  const heroIds = ["T-1042", "T-1048", "T-1055"];
-
-  const filteredTickets = tickets.filter((t) => {
-    if (activeTab === "hero") {
-      return heroIds.includes(t.id);
-    }
-    if (activeTab === "whatsapp") {
-      return t.id.startsWith("T-WA") || (t.channel === "WhatsApp" && !heroIds.includes(t.id));
-    }
-    return true;
-  });
-
-  const heroOpenCount = tickets.filter((t) => heroIds.includes(t.id) && t.status === "OPEN").length;
-
-  const selectedTicket = detail?.ticket || tickets.find((t) => t.id === selectedId);
-  const primarySettlement = detail?.settlements?.[0];
-
-  const isContradiction =
-    selectedTicket?.status === "OPEN" &&
-    primarySettlement?.status === "SUCCESS";
-
-  const cannotAutoRetry =
-    primarySettlement &&
-    primarySettlement.status === "SUCCESS" &&
-    selectedTicket?.status === "OPEN";
 
   // ─── Stations ──────────────────────────────────────────────────────────────
 
@@ -484,7 +519,7 @@ export default function ResolveOS() {
           <button
             onClick={handleReset}
             className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-white/80 hover:text-white bg-white/10 hover:bg-white/15 rounded transition"
-            title="Reset SQLite database to initial seed data"
+            title="Clear tickets and reset test ledger"
           >
             <RotateCcw className="w-3 h-3 text-[#00BAF2]" />
             <span>Reset demo</span>
@@ -552,45 +587,11 @@ export default function ResolveOS() {
           <div className="p-3 border-b border-[#E5E7EB] flex items-center justify-between shrink-0">
             <span className="font-medium text-[13px] text-[#002970]">Queue</span>
             <span className="text-[11px] font-normal text-slate-500">
-              {heroOpenCount} open
+              {tickets.filter((t) => t.status === "OPEN").length} open · {tickets.length} total
             </span>
           </div>
 
-          {/* Tabs */}
-          <div className="flex border-b border-[#E5E7EB] bg-slate-50 text-xs shrink-0 font-medium">
-            <button
-              onClick={() => setActiveTab("hero")}
-              className={`flex-1 py-2 text-center transition ${
-                activeTab === "hero"
-                  ? "bg-white text-[#002970] font-medium border-b-2 border-[#00BAF2]"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              Hero demo
-            </button>
-            <button
-              onClick={() => setActiveTab("whatsapp")}
-              className={`flex-1 py-2 text-center transition ${
-                activeTab === "whatsapp"
-                  ? "bg-white text-[#002970] font-medium border-b-2 border-[#00BAF2]"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              WhatsApp live
-            </button>
-            <button
-              onClick={() => setActiveTab("all")}
-              className={`flex-1 py-2 text-center transition ${
-                activeTab === "all"
-                  ? "bg-white text-[#002970] font-medium border-b-2 border-[#00BAF2]"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              All
-            </button>
-          </div>
-
-          {/* List */}
+          {/* Ticket List */}
           <div className="flex-1 overflow-y-auto divide-y divide-[#E5E7EB]">
             {loading ? (
               <div className="p-4 space-y-3">
@@ -601,12 +602,15 @@ export default function ResolveOS() {
                   </div>
                 ))}
               </div>
-            ) : filteredTickets.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-400">
-                No tickets in this queue. Click &quot;Reset demo&quot; above.
+            ) : tickets.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-400 space-y-1.5 my-auto">
+                <div className="font-medium text-slate-600">No active tickets</div>
+                <div className="text-[11px] text-slate-400">
+                  Send a message from WhatsApp or use the test sender below.
+                </div>
               </div>
             ) : (
-              filteredTickets.map((ticket) => {
+              tickets.map((ticket) => {
                 const isSelected = ticket.id === selectedId;
 
                 return (
@@ -651,48 +655,34 @@ export default function ResolveOS() {
                       <span>{ticket.channel}</span>
                       <span>{timeAgo(ticket.created_at)}</span>
                     </div>
-
-                    {activeTab === "whatsapp" && (
-                      <div className="text-[10px] font-medium text-[#00BAF2] mt-0.5">
-                        {ticket.text.toLowerCase().includes("refund") || ticket.amount === 850
-                          ? "mapped by keyword “refund” → Glow"
-                          : ticket.text.toLowerCase().includes("freeze") || ticket.amount === 184000
-                          ? "mapped by keyword “freeze” → Delhi"
-                          : ticket.text.toLowerCase().includes("settlement") || ticket.amount === 14280
-                          ? "mapped by keyword “settlement” → Sharma"
-                          : "mapped by sender profile"}
-                      </div>
-                    )}
                   </button>
                 );
               })
             )}
           </div>
 
-          {/* Inbound Simulator (on WhatsApp tab) */}
-          {activeTab === "whatsapp" && (
-            <div className="p-3 border-t border-[#E5E7EB] bg-slate-50 shrink-0">
-              <span className="text-[10px] font-medium tracking-[0.06em] text-[#6B7280] uppercase block mb-1.5">
-                Simulate Inbound WhatsApp
-              </span>
-              <form onSubmit={handleSimulateInbound} className="flex gap-1.5">
-                <input
-                  type="text"
-                  value={simText}
-                  onChange={(e) => setSimText(e.target.value)}
-                  placeholder="e.g. 14280 nahi aaya"
-                  className="flex-1 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:border-[#00BAF2]"
-                />
-                <button
-                  type="submit"
-                  disabled={simSending || !simText.trim()}
-                  className="px-2.5 py-1 bg-[#002970] text-white rounded text-xs font-medium hover:bg-[#001f56] disabled:opacity-50"
-                >
-                  <Send className="w-3 h-3" />
-                </button>
-              </form>
-            </div>
-          )}
+          {/* Inbound Simulator */}
+          <div className="p-3 border-t border-[#E5E7EB] bg-slate-50 shrink-0">
+            <span className="text-[10px] font-medium tracking-[0.06em] text-[#6B7280] uppercase block mb-1.5">
+              Simulate Inbound WhatsApp
+            </span>
+            <form onSubmit={handleSimulateInbound} className="flex gap-1.5">
+              <input
+                type="text"
+                value={simText}
+                onChange={(e) => setSimText(e.target.value)}
+                placeholder="e.g. kal ka settlement 14280 nahi aaya"
+                className="flex-1 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:border-[#00BAF2]"
+              />
+              <button
+                type="submit"
+                disabled={simSending || !simText.trim()}
+                className="px-2.5 py-1 bg-[#002970] text-white rounded text-xs font-medium hover:bg-[#001f56] disabled:opacity-50"
+              >
+                <Send className="w-3 h-3" />
+              </button>
+            </form>
+          </div>
         </aside>
 
         {/* ═══════════════════════════════════════════════════════════════════
@@ -710,13 +700,7 @@ export default function ResolveOS() {
                     </span>
                     <span className="text-slate-300">·</span>
                     <span className="text-base font-medium text-slate-800">
-                      {selectedTicket.id === "T-1042"
-                        ? "Settlement missing"
-                        : selectedTicket.id === "T-1048"
-                        ? "Customer refund dispute"
-                        : selectedTicket.id === "T-1055"
-                        ? "Settlement failed · AML freeze"
-                        : selectedTicket.intent || "Merchant Operations Dispute"}
+                      {selectedTicket.intent || "Merchant Operations Dispute"}
                     </span>
                   </div>
                   <div className="text-xs font-normal text-slate-500 mt-0.5">
@@ -747,7 +731,7 @@ export default function ResolveOS() {
                       ) : (
                         <>
                           <Play className="w-3 h-3 fill-current" />
-                          <span>Run Resolve OS</span>
+                          <span>{selectedTicket.status === "OPEN" ? "Run Resolve OS" : "Re-run Resolve OS"}</span>
                         </>
                       )}
                     </button>
@@ -804,65 +788,98 @@ export default function ResolveOS() {
                 </div>
               </div>
 
-              {/* 3d. Outcome Banner (The photographable slide) */}
-              {(selectedTicket.status === "RESOLVED" ||
-                selectedTicket.status === "WAITING_ON_MERCHANT" ||
-                selectedTicket.status === "WAITING" ||
-                selectedTicket.status === "ESCALATED") && (
-                <div
-                  className={`rounded-lg p-5 border ${
-                    selectedTicket.status === "RESOLVED"
-                      ? "bg-emerald-50 border-emerald-500 text-emerald-950"
-                      : selectedTicket.status === "WAITING_ON_MERCHANT" || selectedTicket.status === "WAITING"
-                      ? "bg-amber-50 border-amber-500 text-amber-950"
-                      : "bg-red-50 border-red-500 text-red-950"
-                  }`}
-                >
-                  <div className="text-lg font-medium tracking-tight">
-                    {selectedTicket.status === "RESOLVED"
-                      ? "RESOLVED · RETRY ALLOWED"
-                      : selectedTicket.status === "WAITING_ON_MERCHANT" || selectedTicket.status === "WAITING"
-                      ? "WAITING ON MERCHANT · UTR REQUIRED"
-                      : "ESCALATED · RISK OPS REVIEW"}
-                  </div>
-
-                  <p className="mt-1 text-sm font-normal opacity-90">
-                    {selectedTicket.status === "RESOLVED" &&
-                      `Retry allowed on test ledger. ${formatRupees(
-                        primarySettlement?.amount || selectedTicket.amount
-                      )} · batch ${primarySettlement?.id || "stl_7781"}. Merchant notified.`}
-
-                    {(selectedTicket.status === "WAITING_ON_MERCHANT" || selectedTicket.status === "WAITING") &&
-                      "Did not refund. 3 payments, no UTR. Asked merchant for UTR."}
-
-                    {selectedTicket.status === "ESCALATED" &&
-                      "Did not retry. Frozen / over limit / unknown risk. Brief sent to Risk Ops."}
-                  </p>
-                </div>
-              )}
-
-              {/* 3e. Outbound WhatsApp */}
-              {detail?.latest_whatsapp && (
-                <div className="flex flex-col items-end">
-                  <div className="bg-[#DCF8C6] border border-emerald-200 text-slate-900 rounded-lg p-4 max-w-2xl">
-                    <div className="flex items-center justify-between border-b border-emerald-200/50 pb-1 mb-2 gap-4">
-                      <span className="text-[10px] font-medium tracking-[0.06em] text-emerald-800 uppercase">
-                        TEMPLATE · allowlisted
-                      </span>
-                      <span className="text-[11px] font-normal text-emerald-700">
-                        {timeAgo(detail.latest_whatsapp.created_at)}
-                      </span>
+              {/* 3d. Outcome Banner (Big and quiet) */}
+              {selectedTicket.status === "RESOLVED" && (
+                <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-lg text-emerald-950 flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <div>
+                    <div className="text-sm font-medium">RESOLVED · Settlement retried</div>
+                    <div className="text-xs font-normal text-emerald-800 mt-0.5">
+                      Batch re-pushed to bank file. Expected in merchant account within 2 hours.
                     </div>
-                    <p className="text-[14px] font-normal leading-relaxed text-slate-900">
-                      {detail.latest_whatsapp.body}
-                    </p>
                   </div>
                 </div>
               )}
+
+              {selectedTicket.status === "WAITING_ON_MERCHANT" && (
+                <div className="p-4 bg-amber-50 border border-amber-300 rounded-lg text-amber-950 flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                  <div>
+                    <div className="text-sm font-medium">WAITING ON MERCHANT · UTR requested</div>
+                    <div className="text-xs font-normal text-amber-800 mt-0.5">
+                      Multiple matches in ledger. WhatsApp template sent requesting 12-digit UTR.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedTicket.status === "ESCALATED" && (
+                <div className="p-4 bg-red-50 border border-red-300 rounded-lg text-red-950 flex items-center gap-3">
+                  <ShieldAlert className="w-5 h-5 text-red-600 shrink-0" />
+                  <div>
+                    <div className="text-sm font-medium">ESCALATED · Risk Ops review</div>
+                    <div className="text-xs font-normal text-red-800 mt-0.5">
+                      Deterministic policy blocked automated retry. Handed off to human queue with structured brief.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 3e. Inbound / Outbound WhatsApp Timeline */}
+              <div className="bg-white border border-[#E5E7EB] rounded-lg p-4 space-y-3">
+                <span className="text-[10px] font-medium tracking-[0.06em] text-[#6B7280] uppercase block">
+                  WhatsApp Thread
+                </span>
+
+                <div className="space-y-2 max-w-xl">
+                  {/* Inbound */}
+                  <div className="bg-slate-100 rounded-lg p-3 text-xs text-slate-800">
+                    <div className="text-[10px] font-medium text-slate-400 mb-1">
+                      {detail?.merchant?.name || selectedTicket.merchant_name} · Inbound
+                    </div>
+                    <div>{selectedTicket.text}</div>
+                  </div>
+
+                  {/* Outbound */}
+                  {detail?.latest_whatsapp ? (
+                    <div className="bg-[#00BAF2]/10 border border-[#00BAF2]/30 rounded-lg p-3 text-xs text-slate-900 ml-6">
+                      <div className="text-[10px] font-medium text-[#002970] mb-1 flex items-center justify-between">
+                        <span>Resolve OS · Outbound ({detail.latest_whatsapp.template_id})</span>
+                        <span className="text-[10px] text-emerald-600 font-medium">SENT VIA META API</span>
+                      </div>
+                      <div className="leading-relaxed">{detail.latest_whatsapp.body}</div>
+                    </div>
+                  ) : (
+                    <div className="text-slate-400 text-xs italic pl-2">
+                      No outbound message sent yet. Run Resolve OS to dispatch.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center p-8 text-slate-400 text-sm">
-              Select a ticket from the queue on the left.
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto space-y-4">
+              <div className="w-12 h-12 rounded-full bg-[#002970]/10 flex items-center justify-center text-[#002970]">
+                <MessageSquare className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <div className="text-base font-medium text-slate-800">
+                  Awaiting Live Merchant Inquiries
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  The queue is live with zero seeded fake tickets. Send a real message on WhatsApp or use the test sender on the left.
+                </p>
+              </div>
+              <div className="bg-white border border-[#E5E7EB] rounded-lg p-3.5 w-full text-left text-xs space-y-1.5 shadow-sm">
+                <div className="flex items-center justify-between text-[10px] font-medium tracking-[0.06em] text-slate-400 uppercase">
+                  <span>WHATSAPP SUPPORT CHANNEL</span>
+                  <span className="text-emerald-600 font-mono">CONNECTED</span>
+                </div>
+                <div className="font-medium text-slate-800 text-sm font-mono">+1 (555) 201-3457</div>
+                <div className="text-[11px] text-slate-500">
+                  Auto-handled by Sarvam 105B &middot; Deterministic Policy &middot; Live Ledger
+                </div>
+              </div>
             </div>
           )}
         </main>
@@ -981,7 +998,7 @@ export default function ResolveOS() {
                   )}
                 </div>
                 <div>
-                  {detail?.merchant?.risk_flag || primarySettlement?.reason?.includes("FROZEN") ? (
+                  {activeMerchant?.risk_flag || primarySettlement?.reason?.includes("FROZEN") ? (
                     <span className="text-red-700">✗ active AML freeze flag</span>
                   ) : (
                     <span className="text-emerald-700">✓ no freeze / AML</span>
@@ -1084,7 +1101,7 @@ export default function ResolveOS() {
                   onClick={handleResetMerchant}
                   className="w-full py-1 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-medium transition"
                 >
-                  Reset This Merchant
+                  Reset Active Merchant
                 </button>
               </div>
             )}

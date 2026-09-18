@@ -14,7 +14,7 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def setup_clean_db():
-    seed_database()
+    seed_database(seed_hero_tickets=True)
 
 def test_scenario_t1042_autoclose():
     # 1. Run T-1042

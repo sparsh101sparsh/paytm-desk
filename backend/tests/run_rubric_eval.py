@@ -52,7 +52,7 @@ def run_all():
     print("\n## A. Website — three hero tickets\n")
 
     # Test A1: T-1042
-    seed_database()
+    seed_database(seed_hero_tickets=True)
     r = client.post("/api/tickets/T-1042/run")
     assert r.status_code == 200, r.text
     res_a1 = r.json()
@@ -178,7 +178,7 @@ ACTUAL RESULT:
     print("\n## B. Website — proof it is not hardcoded\n")
 
     # Test B1: Sharma amount 200000
-    seed_database()
+    seed_database(seed_hero_tickets=True)
     conn = get_db()
     conn.execute("UPDATE settlements SET amount = 200000.0 WHERE merchant_id = 'm_2041'")
     conn.commit()
@@ -208,7 +208,7 @@ ACTUAL RESULT:
     ))
 
     # Test B2: Delhi risk flags cleared and amount under 50k
-    seed_database()
+    seed_database(seed_hero_tickets=True)
     conn = get_db()
     conn.execute("UPDATE merchants SET risk_flag = NULL WHERE id = 'm_2099'")
     conn.execute("UPDATE settlements SET status = 'INITIATED', reason = 'BANK_FILE_PENDING', amount = 14280.0 WHERE merchant_id = 'm_2099'")

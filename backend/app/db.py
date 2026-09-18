@@ -27,6 +27,7 @@ def init_db(conn=None):
     cur.executescript("""
     CREATE TABLE IF NOT EXISTS merchants (
         id TEXT PRIMARY KEY,
+        phone TEXT DEFAULT NULL,
         name TEXT NOT NULL,
         city TEXT NOT NULL,
         category TEXT NOT NULL,
@@ -141,6 +142,10 @@ def init_db(conn=None):
         created_at TEXT NOT NULL
     );
     """)
+    cur.execute("PRAGMA table_info(merchants);")
+    cols = [r["name"] for r in cur.fetchall()]
+    if "phone" not in cols:
+        cur.execute("ALTER TABLE merchants ADD COLUMN phone TEXT DEFAULT NULL;")
     conn.commit()
     if close_at_end:
         conn.close()

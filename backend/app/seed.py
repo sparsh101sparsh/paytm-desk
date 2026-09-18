@@ -10,7 +10,7 @@ from .db import get_db, init_db, now_iso
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 
-def seed_database():
+def seed_database(seed_hero_tickets: bool = False):
     init_db()
     conn = get_db()
     cur = conn.cursor()
@@ -36,18 +36,25 @@ def seed_database():
         merchants = json.load(f)
     for m in merchants:
         cur.execute("""
-            INSERT INTO merchants (id, name, city, category, qr_status, soundbox_status, avg_gmv, preferred_lang, risk_flag, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO merchants (id, phone, name, city, category, qr_status, soundbox_status, avg_gmv, preferred_lang, risk_flag, created_at)
+            VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (m["id"], m["name"], m["city"], m["category"], m["qr_status"], m["soundbox_status"], m["avg_gmv"], m["preferred_lang"], m.get("risk_flag"), now_iso()))
 
-    # 2. Seed tickets
-    with open(DATA_DIR / "tickets.json", "r") as f:
-        tickets = json.load(f)
-    for t in tickets:
-        cur.execute("""
-            INSERT INTO tickets (id, merchant_id, text, channel, status, amount, intent, priority, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (t["id"], t["merchant_id"], t["text"], t["channel"], t["status"], t["amount"], t["intent"], t["priority"], t["created_at"]))
+    # Primary merchant row for the WhatsApp number / sandbox
+    cur.execute("""
+        INSERT OR REPLACE INTO merchants (id, phone, name, city, category, qr_status, soundbox_status, avg_gmv, preferred_lang, risk_flag, created_at)
+        VALUES ('m_me', '919810012345', 'Sparsh', 'Delhi NCR', 'Merchant Partner', 'LIVE', 'ONLINE', 25000.0, 'hi-en', NULL, ?)
+    """, (now_iso(),))
+
+    # 2. Seed tickets (ONLY if explicitly requested by test runner — live desk starts with EMPTY queue)
+    if seed_hero_tickets:
+        with open(DATA_DIR / "tickets.json", "r") as f:
+            tickets = json.load(f)
+        for t in tickets:
+            cur.execute("""
+                INSERT INTO tickets (id, merchant_id, text, channel, status, amount, intent, priority, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (t["id"], t["merchant_id"], t["text"], t["channel"], t["status"], t["amount"], t["intent"], t["priority"], t["created_at"]))
 
     # 3. Seed settlements
     with open(DATA_DIR / "settlements.json", "r") as f:
@@ -58,6 +65,12 @@ def seed_database():
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (s["id"], s["merchant_id"], s.get("ticket_id"), s["amount"], s["status"], s.get("reason"), s.get("utr"), s.get("retry_count", 0), s["created_at"]))
 
+    # Test ledger row for m_me
+    cur.execute("""
+        INSERT OR REPLACE INTO settlements (id, merchant_id, ticket_id, amount, status, reason, utr, retry_count, created_at)
+        VALUES ('stl_me_01', 'm_me', NULL, 14280.0, 'INITIATED', 'BANK_FILE_PENDING', NULL, 0, ?)
+    """, (now_iso(),))
+
     # 4. Seed transactions
     with open(DATA_DIR / "transactions.json", "r") as f:
         transactions = json.load(f)
@@ -67,13 +80,21 @@ def seed_database():
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (tx["id"], tx["merchant_id"], tx.get("ticket_id"), tx["amount"], tx["status"], tx.get("utr"), tx["created_at"]))
 
+    # Test transactions for m_me (for refund testing)
+    cur.execute("""
+        INSERT OR REPLACE INTO transactions (id, merchant_id, ticket_id, amount, status, utr, created_at)
+        VALUES ('tx_me_01', 'm_me', NULL, 850.0, 'SUCCESS', 'PAYTM1092837465', ?),
+               ('tx_me_02', 'm_me', NULL, 850.0, 'SUCCESS', 'PAYTM8472910384', ?)
+    """, (now_iso(), now_iso()))
+
     # 5. Seed devices
     devices = [
         ("dev_01", "m_2041", "SOUNDBOX", "ONLINE"),
         ("dev_02", "m_2048", "SOUNDBOX", "ONLINE"),
         ("dev_03", "m_2099", "SOUNDBOX", "ONLINE"),
         ("dev_04", "m_2104", "SOUNDBOX", "OFFLINE"),
-        ("dev_05", "m_2115", "SOUNDBOX", "ONLINE")
+        ("dev_05", "m_2115", "SOUNDBOX", "ONLINE"),
+        ("dev_me", "m_me", "SOUNDBOX", "ONLINE")
     ]
     for d in devices:
         cur.execute("""
@@ -85,7 +106,7 @@ def seed_database():
     cur.execute("""
         INSERT INTO cognee_sync_log (merchant_id, action, query, hit_count, payload_json, created_at)
         VALUES (?, 'ADD', 'Ingest 5 merchant profiles, settlements, and SOPs into graph memory', 5, ?, ?)
-    """, ("SYSTEM", json.dumps({"status": "seeded", "merchants_count": len(merchants)}), now_iso()))
+    """, ("SYSTEM", json.dumps({"status": "seeded", "merchants_count": len(merchants) + 1}), now_iso()))
 
     conn.commit()
     conn.close()
