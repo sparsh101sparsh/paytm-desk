@@ -2,8 +2,8 @@ import "./globals.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Paytm for Business · Resolve OS",
-  description: "Autonomous AI Teammate for Paytm Merchant Support",
+  title: "Resolve OS · Autonomous Merchant Support",
+  description: "AI-powered autonomous operations teammate for merchant support. Sarvam + Deterministic Policy + Meta WhatsApp.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
