@@ -54,7 +54,40 @@ def execute_retry_settlement_file(ticket_id: str, batch_id: str, policy_token: s
     log_audit(ticket_id, "N8N", "ACTED", {"tool": "retry_settlement_file", "result": result}, "SETTLEMENT_RETRY_OK", policy_token, 412)
     return result
 
-def execute_send_whatsapp(ticket_id: str, template_id: str, variables: dict) -> Dict[str, Any]:
+def send_meta_whatsapp_message(to_phone: str, message_body: str) -> bool:
+    """Dispatches real outbound WhatsApp message using Meta WhatsApp Cloud API."""
+    import os
+    import httpx
+    token = os.getenv("WHATSAPP_TOKEN", "")
+    phone_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
+    if not token or not phone_id or not to_phone:
+        return False
+
+    url = f"https://graph.facebook.com/v20.0/{phone_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    # Clean phone: ensure format like '919876543210' without '+' or spaces
+    clean_to = "".join(filter(str.isdigit, to_phone))
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": clean_to,
+        "type": "text",
+        "text": {"body": message_body}
+    }
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            resp = client.post(url, headers=headers, json=payload)
+            if resp.status_code in (200, 201):
+                return True
+            else:
+                print(f"[WhatsApp Meta API Error] {resp.status_code}: {resp.text}")
+    except Exception as e:
+        print(f"[WhatsApp Meta API Exception] {e}")
+    return False
+
+def execute_send_whatsapp(ticket_id: str, template_id: str, variables: dict, recipient_phone: str = None) -> Dict[str, Any]:
     conn = get_db()
     cur = conn.cursor()
 
@@ -69,7 +102,18 @@ def execute_send_whatsapp(ticket_id: str, template_id: str, variables: dict) -> 
     conn.commit()
     conn.close()
 
-    result = {"message_id": msg_id, "template_id": template_id, "body": body, "status": "sent"}
+    # If recipient phone is provided or ticket maps to a phone, dispatch via Meta WhatsApp Cloud API
+    meta_sent = False
+    if recipient_phone:
+        meta_sent = send_meta_whatsapp_message(recipient_phone, body)
+
+    result = {
+        "message_id": msg_id,
+        "template_id": template_id,
+        "body": body,
+        "status": "sent",
+        "meta_cloud_sent": meta_sent
+    }
     log_audit(ticket_id, "N8N", "NOTIFIED", {"tool": "send_whatsapp", "result": result}, None, None, 180)
     return result
 

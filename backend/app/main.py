@@ -8,6 +8,7 @@ import json
 import uuid
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 
@@ -136,7 +137,7 @@ def get_ticket_events(ticket_id: str):
     return events
 
 @app.post("/api/tickets/{ticket_id}/run", response_model=RunResponse)
-def run_desk(ticket_id: str, request: Request = None):
+def run_desk(ticket_id: str, request: Request = None, recipient_phone: Optional[str] = None):
     """
     Runs the full DESK lifecycle:
     1. Check N8N_WEBHOOK_URL if external orchestrator is active
@@ -249,7 +250,8 @@ def run_desk(ticket_id: str, request: Request = None):
         execute_send_whatsapp(
             ticket_id=ticket_id,
             template_id="settlement_retry_sent",
-            variables={"batch_id": batch_id, "ticket_id": ticket_id}
+            variables={"batch_id": batch_id, "ticket_id": ticket_id},
+            recipient_phone=recipient_phone
         )
         execute_update_ticket(ticket_id, "RESOLVED", decision.policy_token)
         remember_outcome(ticket_id, merchant.get("id"), "retry_settlement_file", "RESOLVED_SUCCESS")
@@ -258,7 +260,8 @@ def run_desk(ticket_id: str, request: Request = None):
         execute_send_whatsapp(
             ticket_id=ticket_id,
             template_id="ask_utr",
-            variables={"merchant_name": merchant.get("name", "Merchant"), "ticket_id": ticket_id}
+            variables={"merchant_name": merchant.get("name", "Merchant"), "ticket_id": ticket_id},
+            recipient_phone=recipient_phone
         )
         execute_update_ticket(ticket_id, "WAITING_ON_MERCHANT", decision.policy_token)
         remember_outcome(ticket_id, merchant.get("id"), "ask_merchant_utr", "WAITING_ON_MERCHANT")
@@ -274,6 +277,13 @@ def run_desk(ticket_id: str, request: Request = None):
             "recommendation": "Risk Ops review account freeze status with compliance and call merchant."
         }
         execute_assign_human(ticket_id, "RISK_OPS", brief_info, decision.policy_token)
+        if recipient_phone:
+            execute_send_whatsapp(
+                ticket_id=ticket_id,
+                template_id="escalated_risk",
+                variables={"merchant_name": merchant.get("name", "Merchant"), "ticket_id": ticket_id},
+                recipient_phone=recipient_phone
+            )
         remember_outcome(ticket_id, merchant.get("id"), "escalate_risk", "ESCALATED_RISK_OPS")
 
     # Update ticket with execution id
@@ -331,4 +341,117 @@ def execute_tool(tool_name: str, body: Dict[str, Any]):
         return execute_assign_human(ticket_id, queue, brief_dict, policy_token)
 
     raise HTTPException(status_code=400, detail=f"Unknown tool: {tool_name}")
+
+
+# ============================================================================
+# META WHATSAPP CLOUD API WEBHOOK ENDPOINTS
+# ============================================================================
+
+WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "paytm_desk_hackathon_2026")
+
+@app.get("/api/webhook/whatsapp")
+@app.get("/webhook/whatsapp")
+def verify_meta_whatsapp(request: Request):
+    """
+    Verification endpoint called by Meta WhatsApp Cloud API during webhook setup.
+    Meta expects a 200 OK with the exact hub.challenge as plain text.
+    """
+    params = request.query_params
+    mode = params.get("hub.mode")
+    token = params.get("hub.verify_token")
+    challenge = params.get("hub.challenge")
+
+    if mode == "subscribe" and token == WHATSAPP_VERIFY_TOKEN:
+        return PlainTextResponse(content=challenge or "", status_code=200)
+
+    raise HTTPException(status_code=403, detail="Verification token mismatch")
+
+
+@app.post("/api/webhook/whatsapp")
+@app.post("/webhook/whatsapp")
+async def receive_meta_whatsapp(request: Request):
+    """
+    Event listener called by Meta WhatsApp Cloud API when a merchant sends a message.
+    1. Extracts sender phone & message body
+    2. Maps to Paytm merchant profile & creates ticket in SQLite
+    3. Runs autonomous DESK policy pipeline
+    4. Automatically dispatches approved response via WhatsApp Cloud API
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        return {"status": "ignored_non_json"}
+
+    # Validate Meta event envelope
+    entry_list = data.get("entry", [])
+    if not entry_list:
+        return {"status": "no_entry"}
+
+    change_val = entry_list[0].get("changes", [{}])[0].get("value", {})
+    messages = change_val.get("messages", [])
+    if not messages:
+        # Ignore message delivery receipts / statuses (sent, delivered, read)
+        return {"status": "ignored_status_receipt"}
+
+    msg = messages[0]
+    sender_phone = msg.get("from", "")
+    msg_type = msg.get("type", "")
+
+    if msg_type != "text":
+        return {"status": "ignored_non_text"}
+
+    sender_text = msg.get("text", {}).get("body", "").strip()
+    if not sender_text:
+        return {"status": "empty_body"}
+
+    text_lower = sender_text.lower()
+
+    # Smart Merchant association for demo:
+    # m_2041: Sharma Kirana (Settlement issues)
+    # m_2048: Glow Salon (Refund issues)
+    # m_2099: Delhi Electronics (Frozen/AML risk)
+    if "refund" in text_lower:
+        merchant_id = "m_2048"
+    elif any(k in text_lower for k in ["freeze", "frozen", "aml", "rent", "turant"]):
+        merchant_id = "m_2099"
+    else:
+        merchant_id = "m_2041"
+
+    # Extract numeric amount if mentioned
+    import re
+    amount_match = re.search(r'(\d+[\d,]*)', sender_text.replace(" ", ""))
+    amount_val = None
+    if amount_match:
+        try:
+            amount_val = float(amount_match.group(1).replace(",", ""))
+        except Exception:
+            amount_val = None
+
+    # Generate new Ticket ID
+    import random
+    ticket_id = f"T-WA{random.randint(100, 999)}"
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO tickets (id, merchant_id, text, channel, status, amount, priority, created_at)
+        VALUES (?, ?, ?, 'WhatsApp', 'OPEN', ?, 'HIGH', ?)
+    """, (ticket_id, merchant_id, sender_text, amount_val, now_iso()))
+    conn.commit()
+    conn.close()
+
+    # Execute full DESK lifecycle, passing sender_phone so the reply goes back to their WhatsApp!
+    try:
+        run_res = run_desk(ticket_id=ticket_id, request=None, recipient_phone=sender_phone)
+        return {
+            "status": "success",
+            "ticket_id": ticket_id,
+            "decision": run_res.status,
+            "reason_code": run_res.reason_code,
+            "sender_phone": sender_phone
+        }
+    except Exception as e:
+        print(f"Error processing WhatsApp ticket {ticket_id}: {e}")
+        return {"status": "error", "error": str(e), "ticket_id": ticket_id}
+
 
