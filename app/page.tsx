@@ -136,7 +136,7 @@ export default function ResolveOS() {
   const [fallbackLedger, setFallbackLedger] = useState<{ merchant: any; settlements: Settlement[] } | null>(null);
 
   // Tab State & Gliding Indicator Tracking (NETRA Pattern)
-  const [activeTab, setActiveTab] = useState<"hero" | "whatsapp" | "all">("all");
+  const [activeTab, setActiveTab] = useState<"hero" | "whatsapp" | "all">("whatsapp");
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const [tabPillStyle, setTabPillStyle] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const tabsContainerRef = useRef<HTMLDivElement>(null);
@@ -504,6 +504,51 @@ export default function ResolveOS() {
       }
     } catch {
       showToast("error", "Failed to reset merchant.");
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!selectedId) return;
+    try {
+      const res = await fetch(getApiUrl(`/api/tickets/${selectedId}/approve`), { method: "POST" });
+      if (res.ok) {
+        showToast("success", "Ticket approved & settlement confirmed.");
+        await Promise.all([fetchDetail(selectedId), fetchTickets(), fetchFallbackLedger()]);
+      } else {
+        showToast("error", "Failed to approve ticket");
+      }
+    } catch {
+      showToast("error", "Network error approving ticket");
+    }
+  };
+
+  const handleReject = async () => {
+    if (!selectedId) return;
+    try {
+      const res = await fetch(getApiUrl(`/api/tickets/${selectedId}/reject`), { method: "POST" });
+      if (res.ok) {
+        showToast("info", "Ticket rejected & merchant notified.");
+        await Promise.all([fetchDetail(selectedId), fetchTickets(), fetchFallbackLedger()]);
+      } else {
+        showToast("error", "Failed to reject ticket");
+      }
+    } catch {
+      showToast("error", "Network error rejecting ticket");
+    }
+  };
+
+  const handleConfirmBatch = async () => {
+    try {
+      const res = await fetch(getApiUrl("/api/demo/confirm-settlement"), { method: "POST" });
+      if (res.ok) {
+        showToast("success", "Bank reconciliation received: batch confirmed to SUCCESS + UTR issued.");
+        if (selectedId) await fetchDetail(selectedId);
+        await Promise.all([fetchTickets(), fetchFallbackLedger()]);
+      } else {
+        showToast("error", "Failed to confirm batch");
+      }
+    } catch {
+      showToast("error", "Network error confirming batch");
     }
   };
 
@@ -1056,8 +1101,27 @@ export default function ResolveOS() {
                   </div>
                 </div>
 
-                {/* Primary Run Button */}
-                <div>
+                {/* Primary Actions */}
+                <div className="flex items-center gap-2">
+                  {selectedTicket.status === "ESCALATED" && (
+                    <>
+                      <button
+                        onClick={handleApprove}
+                        className="px-3 py-1.5 rounded text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition active:scale-95 flex items-center gap-1.5 shadow-sm"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Approve Override</span>
+                      </button>
+                      <button
+                        onClick={handleReject}
+                        className="px-3 py-1.5 rounded text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition active:scale-95 flex items-center gap-1.5"
+                      >
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        <span>Reject Ticket</span>
+                      </button>
+                    </>
+                  )}
+
                   {cannotAutoRetry ? (
                     <button
                       disabled
@@ -1430,6 +1494,14 @@ export default function ResolveOS() {
                     Set
                   </button>
                 </div>
+
+                <button
+                  onClick={handleConfirmBatch}
+                  className="w-full py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded text-xs font-medium transition flex items-center justify-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Bank Confirms Batch (Reconciliation)</span>
+                </button>
 
                 <button
                   onClick={handleToggleFreeze}

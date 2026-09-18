@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from backend.app.main import app
 from backend.app.seed import seed_database
-from backend.app.db import get_db
+from backend.app.db import get_db, now_iso
 
 client = TestClient(app)
 
@@ -61,11 +61,10 @@ def test_meta_whatsapp_incoming_message():
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "success"
-    assert data["decision"] == "RESOLVED"
-    assert data["reason_code"] == "SETTLEMENT_RETRY_OK"
+    assert data["ticket_id"] is not None
     assert data["sender_phone"] == "919876543210"
 
-    # Check ticket created in SQLite
+    # Check ticket created and processed to RESOLVED in SQLite via BackgroundTasks
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT * FROM tickets WHERE id = ?", (data["ticket_id"],))
@@ -118,19 +117,15 @@ def test_meta_whatsapp_greeting_message():
     res = client.post("/api/webhook/whatsapp", json=greeting_payload)
     assert res.status_code == 200
     data = res.json()
-    assert data["status"] == "success"
-    assert data["decision"] == "RESOLVED"
-    assert data["reason_code"] == "GREETING_ACK"
+    assert data["status"] == "greeting_sent"
+    assert data["ticket_id"] is None
+    assert "Namaste" in data["reply"]
 
-    # Check merchant Sparsh was created dynamically and NOT Sharma Kirana
+    # Check that NO ticket was inserted in SQLite for pure greeting
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM tickets WHERE id = ?", (data["ticket_id"],))
-    ticket = cur.fetchone()
-    assert ticket["merchant_id"] != "m_2041"
-    cur.execute("SELECT name FROM merchants WHERE id = ?", (ticket["merchant_id"],))
-    merchant = cur.fetchone()
-    assert merchant["name"] == "Sparsh Singh"
+    cur.execute("SELECT count(*) as cnt FROM tickets WHERE text LIKE '%hello kaise ho aap%'")
+    assert cur.fetchone()["cnt"] == 0
     conn.close()
 
 
@@ -177,17 +172,143 @@ def test_meta_whatsapp_payment_not_received_hinglish():
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "success"
-    assert data["decision"] == "RESOLVED"
-    assert data["reason_code"] == "SETTLEMENT_RETRY_OK"
+    assert data["ticket_id"] is not None
 
-    # Verify settlement batch amount was updated to ₹12,000 and status is SUCCESS
+    # Verify ticket was resolved in SQLite
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT amount, status, utr FROM settlements WHERE merchant_id = 'm_me'")
+    cur.execute("SELECT status FROM tickets WHERE id = ?", (data["ticket_id"],))
+    t = cur.fetchone()
+    assert t is not None
+    assert t["status"] == "RESOLVED"
+
+    # Verify settlement batch amount was updated to ₹12,000 and status is SUCCESS
+    cur.execute("SELECT amount, status, utr FROM settlements WHERE merchant_id = 'm_me' AND amount = 12000.0")
     settlement = cur.fetchone()
     assert settlement is not None
-    assert settlement["amount"] == 12000.0
     assert settlement["status"] == "SUCCESS"
     assert settlement["utr"] is not None
     conn.close()
+
+
+def test_meta_whatsapp_deduplication():
+    payload = {
+        "object": "whatsapp_business_account",
+        "entry": [{
+            "id": "123456789",
+            "changes": [{
+                "value": {
+                    "messaging_product": "whatsapp",
+                    "metadata": {"display_phone_number": "15550234567", "phone_number_id": "10001"},
+                    "messages": [{
+                        "from": "919876543210",
+                        "id": "wamid.DEDUPE_TEST_999",
+                        "timestamp": "1726700000",
+                        "text": {"body": "mera settlement nahi aaya 12000"},
+                        "type": "text"
+                    }]
+                },
+                "field": "messages"
+            }]
+        }]
+    }
+
+    # First delivery -> Accepted
+    res1 = client.post("/api/webhook/whatsapp", json=payload)
+    assert res1.status_code == 200
+    assert res1.json()["status"] == "success"
+
+    # Second delivery (same wamid) -> Ignored as already_processed
+    res2 = client.post("/api/webhook/whatsapp", json=payload)
+    assert res2.status_code == 200
+    assert res2.json()["status"] == "already_processed"
+    assert res2.json()["msg_id"] == "wamid.DEDUPE_TEST_999"
+
+
+def test_meta_whatsapp_already_settled_no_risk_ops():
+    # Inquire about ₹14,280 which is already SUCCESS in seeded DB
+    payload = {
+        "object": "whatsapp_business_account",
+        "entry": [{
+            "id": "123456789",
+            "changes": [{
+                "value": {
+                    "messaging_product": "whatsapp",
+                    "metadata": {"display_phone_number": "15550234567", "phone_number_id": "10001"},
+                    "messages": [{
+                        "from": "919810012345",
+                        "id": "wamid.SUCCESS_TEST_01",
+                        "timestamp": "1726700000",
+                        "text": {"body": "mera 14280 ka settlement check karo"},
+                        "type": "text"
+                    }]
+                },
+                "field": "messages"
+            }]
+        }]
+    }
+
+    res = client.post("/api/webhook/whatsapp", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT status FROM tickets WHERE id = ?", (data["ticket_id"],))
+    ticket = cur.fetchone()
+    # Must be RESOLVED, NOT ESCALATED to Risk Ops!
+    assert ticket["status"] == "RESOLVED"
+
+    # Verify outbound WhatsApp message confirms already SUCCESS with UTR
+    cur.execute("SELECT template_id, body FROM whatsapp_messages WHERE ticket_id = ?", (data["ticket_id"],))
+    wa_msg = cur.fetchone()
+    assert wa_msg is not None
+    assert wa_msg["template_id"] == "settlement_already_settled"
+    assert "SUCCESS" in wa_msg["body"] or "pehle hi" in wa_msg["body"]
+    conn.close()
+
+
+def test_operator_approve_and_reject():
+    conn = get_db()
+    cur = conn.cursor()
+    # Create an escalated ticket
+    cur.execute("""
+        INSERT INTO tickets (id, merchant_id, text, channel, status, amount, priority, created_at)
+        VALUES ('T-ESC-01', 'm_me', 'Large amount settlement', 'WhatsApp', 'ESCALATED', 75000.0, 'HIGH', ?)
+    """, (now_iso(),))
+    conn.commit()
+
+    # 1. Approve
+    res_app = client.post("/api/tickets/T-ESC-01/approve")
+    assert res_app.status_code == 200
+    assert res_app.json()["status"] == "approved"
+
+    cur.execute("SELECT status FROM tickets WHERE id = 'T-ESC-01'")
+    assert cur.fetchone()["status"] == "RESOLVED"
+
+    # 2. Reject
+    cur.execute("""
+        INSERT INTO tickets (id, merchant_id, text, channel, status, amount, priority, created_at)
+        VALUES ('T-ESC-02', 'm_me', 'Suspicious refund claim', 'WhatsApp', 'ESCALATED', 10000.0, 'HIGH', ?)
+    """, (now_iso(),))
+    conn.commit()
+
+    res_rej = client.post("/api/tickets/T-ESC-02/reject")
+    assert res_rej.status_code == 200
+    assert res_rej.json()["status"] == "rejected"
+
+    cur.execute("SELECT status FROM tickets WHERE id = 'T-ESC-02'")
+    assert cur.fetchone()["status"] == "CLOSED_REJECTED"
+    conn.close()
+
+
+def test_demo_bank_confirm_settlement():
+    res = client.post("/api/demo/confirm-settlement")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["result"]["new_status"] == "SUCCESS"
+    assert "PAYTM" in data["result"]["utr"]
+
 

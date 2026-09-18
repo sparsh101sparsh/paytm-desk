@@ -126,7 +126,22 @@ def evaluate_policy(plan: SarvamPlan, db_state: Dict[str, Any]) -> PolicyDecisio
                 args={}
             )
 
-        settlement = settlements[0] # primary relevant settlement
+        # Match settlement by extracted amount if available
+        target_amount = ticket.get("amount")
+        matching_settlements = settlements
+        if target_amount:
+            try:
+                t_amt = float(target_amount)
+                exact_matches = [s for s in settlements if abs(float(s.get("amount", 0.0)) - t_amt) < 1.0]
+                if exact_matches:
+                    matching_settlements = exact_matches
+            except Exception:
+                pass
+
+        # If multiple, prefer INITIATED or RETRY_REQUESTED over SUCCESS
+        pending_candidates = [s for s in matching_settlements if s.get("status") in ["INITIATED", "RETRY_REQUESTED", "FAILED"]]
+        settlement = pending_candidates[0] if pending_candidates else matching_settlements[0]
+
         amt = float(settlement.get("amount", 0.0))
         status = settlement.get("status", "")
         reason = settlement.get("reason", "") or ""
@@ -158,15 +173,28 @@ def evaluate_policy(plan: SarvamPlan, db_state: Dict[str, Any]) -> PolicyDecisio
                 args={"batch_id": settlement.get("id"), "amount": amt}
             )
 
-        # Check status (must be INITIATED)
-        if status != "INITIATED":
+        # If already SUCCESS, inform merchant and resolve ticket with UTR
+        if status == "SUCCESS":
+            token = generate_policy_token(ticket_id, "inform_already_settled", "SETTLEMENT_ALREADY_SUCCESS")
+            return PolicyDecision(
+                allowed=False,
+                action="inform_already_settled",
+                reason_code="SETTLEMENT_ALREADY_SUCCESS",
+                policy_token=token,
+                explanation=f"Settlement {settlement.get('id')} is already SUCCESS in test ledger with UTR {settlement.get('utr') or 'PAYTM1928374650'}.",
+                next_ticket_status="RESOLVED",
+                args={"batch_id": settlement.get("id"), "status": status, "amount": amt, "utr": settlement.get("utr")}
+            )
+
+        # Check status (must be INITIATED or RETRY_REQUESTED)
+        if status not in ["INITIATED", "RETRY_REQUESTED"]:
             token = generate_policy_token(ticket_id, "escalate_status", "SETTLEMENT_RETRY_DENIED_STATUS")
             return PolicyDecision(
                 allowed=False,
                 action="escalate_status",
                 reason_code="SETTLEMENT_RETRY_DENIED_STATUS",
                 policy_token=token,
-                explanation=f"Settlement status '{status}' is ineligible for auto-retry (must be INITIATED).",
+                explanation=f"Settlement status '{status}' is ineligible for auto-retry.",
                 next_ticket_status="ESCALATED",
                 args={"batch_id": settlement.get("id"), "status": status}
             )
@@ -248,14 +276,14 @@ def evaluate_policy(plan: SarvamPlan, db_state: Dict[str, Any]) -> PolicyDecisio
             args={}
         )
 
-    # 4. Unknown or general escalation
-    token = generate_policy_token(ticket_id, "escalate_unknown", "ESCALATE_UNKNOWN_INTENT")
+    # 4. Unknown or general escalation -> Clarify instead of generic Risk Ops
+    token = generate_policy_token(ticket_id, "clarify_unknown", "ESCALATE_UNKNOWN_INTENT")
     return PolicyDecision(
         allowed=False,
-        action="escalate_unknown",
+        action="clarify_unknown",
         reason_code="ESCALATE_UNKNOWN_INTENT",
         policy_token=token,
-        explanation=f"Intent '{plan.intent}' cannot be handled autonomously. Routing to human ops.",
-        next_ticket_status="ESCALATED",
+        explanation=f"Intent '{plan.intent}' requires clarification before action.",
+        next_ticket_status="WAITING_ON_MERCHANT",
         args={"intent": plan.intent}
     )

@@ -7,7 +7,7 @@ import os
 import json
 import uuid
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.responses import PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
@@ -21,6 +21,7 @@ from .memory import search_memory, remember_outcome
 from .tools import (
     log_audit,
     execute_retry_settlement_file,
+    execute_confirm_settlement,
     execute_send_whatsapp,
     execute_update_ticket,
     execute_assign_human,
@@ -448,33 +449,50 @@ def run_desk(ticket_id: str, request: Request = None, recipient_phone: Optional[
         )
         remember_outcome(ticket_id, merchant.get("id"), "request_refund", "REFUND_OK")
 
+    elif decision.reason_code == "SETTLEMENT_ALREADY_SUCCESS":
+        execute_update_ticket(ticket_id, "RESOLVED", decision.policy_token)
+        batch_id = decision.args.get("batch_id", "batch")
+        amt = decision.args.get("amount", 0)
+        utr = decision.args.get("utr") or "PAYTM1928374650"
+        if recipient_phone:
+            execute_send_whatsapp(
+                ticket_id=ticket_id,
+                template_id="settlement_already_settled",
+                variables={
+                    "merchant_name": merchant.get("name", "Merchant"),
+                    "batch_id": batch_id,
+                    "amount": f"{amt:,.0f}",
+                    "utr": utr,
+                    "ticket_id": ticket_id
+                },
+                recipient_phone=recipient_phone
+            )
+        remember_outcome(ticket_id, merchant.get("id"), "inform_already_settled", "SETTLEMENT_ALREADY_SUCCESS")
+
+    elif decision.reason_code == "ESCALATE_UNKNOWN_INTENT":
+        execute_update_ticket(ticket_id, "WAITING_ON_MERCHANT", decision.policy_token)
+        if recipient_phone:
+            execute_send_whatsapp(
+                ticket_id=ticket_id,
+                template_id="clarify_unknown_intent",
+                variables={"merchant_name": merchant.get("name", "Merchant"), "ticket_id": ticket_id},
+                recipient_phone=recipient_phone
+            )
+        remember_outcome(ticket_id, merchant.get("id"), "clarify_unknown", "WAITING_ON_MERCHANT")
+
     elif decision.next_ticket_status == "ESCALATED":
         brief_info = {
             "merchant_name": merchant.get("name", "Unknown"),
             "merchant_id": merchant.get("id", ""),
             "amount": settlements[0].get("amount") if settlements else ticket.get("amount", 0),
-            "reason": settlements[0].get("reason", "RISK_FLAG") if settlements else "SUSPECT_FREEZE",
-            "checks": "Settlement verified in DB, risk/AML flag confirmed in memory, automated retry blocked.",
-            "not_done": "No retry, no refund, no WhatsApp promise of funds.",
-            "recommendation": "Risk Ops review account freeze status with compliance and call merchant."
+            "reason": decision.reason_code,
+            "checks": "Settlement verified in DB, risk/AML flag checked, automated retry blocked.",
+            "not_done": "No funds moved, manual supervisor review required.",
+            "recommendation": "Review merchant account and approve override or close ticket."
         }
         execute_assign_human(ticket_id, "RISK_OPS", brief_info, decision.policy_token)
         if recipient_phone:
-            if decision.reason_code == "SETTLEMENT_RETRY_DENIED_STATUS" and settlements and settlements[0].get("status") == "SUCCESS":
-                stl = settlements[0]
-                execute_send_whatsapp(
-                    ticket_id=ticket_id,
-                    template_id="settlement_already_settled",
-                    variables={
-                        "merchant_name": merchant.get("name", "Merchant"),
-                        "batch_id": stl.get("id", "batch"),
-                        "amount": f"{stl.get('amount', 0):,.0f}",
-                        "utr": stl.get("utr") or "PAYTM9817263541",
-                        "ticket_id": ticket_id
-                    },
-                    recipient_phone=recipient_phone
-                )
-            elif decision.reason_code == "SETTLEMENT_NOT_FOUND":
+            if decision.reason_code == "SETTLEMENT_NOT_FOUND":
                 execute_send_whatsapp(
                     ticket_id=ticket_id,
                     template_id="settlement_not_found",
@@ -599,13 +617,13 @@ def verify_meta_whatsapp(request: Request):
 
 @app.post("/api/webhook/whatsapp")
 @app.post("/webhook/whatsapp")
-async def receive_meta_whatsapp(request: Request):
+async def receive_meta_whatsapp(request: Request, background_tasks: BackgroundTasks):
     """
     Event listener called by Meta WhatsApp Cloud API when a merchant sends a message.
-    1. Extracts sender phone & message body
-    2. Maps to Paytm merchant profile & creates ticket in SQLite
-    3. Runs autonomous Resolve OS policy pipeline
-    4. Automatically dispatches approved response via WhatsApp Cloud API
+    1. Deduplicates on Meta message id (wamid)
+    2. Short-circuits greetings without creating tickets
+    3. Ingests complaint and returns fast 200 OK
+    4. Runs autonomous Resolve OS policy pipeline asynchronously via BackgroundTasks
     """
     try:
         data = await request.json()
@@ -626,6 +644,7 @@ async def receive_meta_whatsapp(request: Request):
     msg = messages[0]
     sender_phone = msg.get("from", "")
     msg_type = msg.get("type", "")
+    msg_id = msg.get("id")
 
     if msg_type != "text":
         return {"status": "ignored_non_text"}
@@ -635,6 +654,7 @@ async def receive_meta_whatsapp(request: Request):
         return {"status": "empty_body"}
 
     text_lower = sender_text.lower().strip()
+    clean_phone = "".join(filter(str.isdigit, sender_phone))
 
     # Extract real sender profile name from Meta payload
     contacts = change_val.get("contacts", [])
@@ -645,12 +665,44 @@ async def receive_meta_whatsapp(request: Request):
     conn = get_db()
     cur = conn.cursor()
 
-    clean_phone = "".join(filter(str.isdigit, sender_phone))
+    # 1. Deduplication on Meta message ID
+    if msg_id:
+        cur.execute("SELECT msg_id FROM processed_messages WHERE msg_id = ?", (msg_id,))
+        if cur.fetchone():
+            conn.close()
+            return {"status": "already_processed", "msg_id": msg_id}
+        cur.execute("INSERT OR IGNORE INTO processed_messages (msg_id, created_at) VALUES (?, ?)", (msg_id, now_iso()))
+        conn.commit()
 
-    # Map phone -> merchant_id (One phone -> One merchant profile)
+    # 2. Greeting / Menu / Digits-only short-circuit: reply immediately without creating a ticket
+    greeting_words = {
+        "hello", "hi", "hey", "namaste", "pranam", "kaise", "ho", "aap", "ji",
+        "kya", "haal", "h", "bhai", "sir", "madam", "help", "menu", "start",
+        "good", "morning", "evening", "afternoon", "shuru", "test"
+    }
+    clean_text = "".join(ch for ch in text_lower if ch.isalnum() or ch.isspace()).strip()
+    words = [w for w in clean_text.split() if w]
+    is_greeting = (
+        clean_text in greeting_words or
+        (words and all(w in greeting_words for w in words)) or
+        clean_text.isdigit()
+    )
+    complaint_signals = ["settle", "payment", "rupaye", "rupees", "rs", "paisa", "refund", "qr", "soundbox", "kat gaya", "aaya", "phasa", "atack", "pending"]
+
+    if is_greeting and not any(k in text_lower for k in complaint_signals):
+        greeting_text = (
+            f"Namaste {sender_name or 'Partner'}! Resolve OS Paytm Merchant Desk me aapka swagat hai. "
+            "Kripya apna settlement status, refund query, ya QR/soundbox problem batayein."
+        )
+        if clean_phone:
+            send_meta_whatsapp_message(clean_phone, greeting_text)
+        conn.close()
+        return {"status": "greeting_sent", "ticket_id": None, "reply": greeting_text}
+
+    # 3. Map phone -> merchant_id
     merchant_id = None
 
-    # 1. Lookup by phone
+    # Lookup by phone
     cur.execute("SELECT id, name FROM merchants WHERE phone = ? OR id = ?", (clean_phone, f"m_{clean_phone}"))
     row = cur.fetchone()
     if row:
@@ -659,7 +711,7 @@ async def receive_meta_whatsapp(request: Request):
             cur.execute("UPDATE merchants SET name = ? WHERE id = ?", (sender_name, merchant_id))
             conn.commit()
 
-    # 2. Lookup by sender_name if known merchant profile (e.g. during rubric tests)
+    # Lookup by sender_name
     if not merchant_id and sender_name and sender_name.lower() not in ["test user", "test user name", "unknown", ""]:
         cur.execute("SELECT id FROM merchants WHERE LOWER(name) = LOWER(?)", (sender_name,))
         row = cur.fetchone()
@@ -668,7 +720,7 @@ async def receive_meta_whatsapp(request: Request):
             cur.execute("UPDATE merchants SET phone = ? WHERE id = ?", (clean_phone, merchant_id))
             conn.commit()
 
-    # 3. Fallback to primary demo merchant m_me
+    # Fallback to primary demo merchant m_me
     if not merchant_id:
         cur.execute("SELECT id, name, phone FROM merchants WHERE id = 'm_me'")
         m_me = cur.fetchone()
@@ -678,7 +730,7 @@ async def receive_meta_whatsapp(request: Request):
             cur.execute("UPDATE merchants SET name = ?, phone = ? WHERE id = 'm_me'", (display_name, clean_phone))
             conn.commit()
 
-    # 4. If new sender phone, create dedicated merchant row & test ledger
+    # If new sender phone, create dedicated merchant profile
     if not merchant_id:
         merchant_id = f"m_{clean_phone}" if clean_phone else f"m_wa_{uuid.uuid4().hex[:6]}"
         display_name = sender_name if (sender_name and sender_name.lower() not in ["test user", "test user name", "unknown", ""]) else "Merchant Partner"
@@ -688,17 +740,8 @@ async def receive_meta_whatsapp(request: Request):
         """, (merchant_id, clean_phone, display_name, now_iso()))
         cur.execute("""
             INSERT OR REPLACE INTO settlements (id, merchant_id, ticket_id, amount, status, reason, utr, retry_count, created_at)
-            VALUES (?, ?, NULL, 14280.0, 'INITIATED', 'BANK_FILE_PENDING', NULL, 0, ?)
+            VALUES (?, ?, NULL, 12000.0, 'INITIATED', 'BANK_FILE_PENDING', NULL, 0, ?)
         """, (f"stl_{merchant_id}", merchant_id, now_iso()))
-        cur.execute("""
-            INSERT OR REPLACE INTO transactions (id, merchant_id, ticket_id, amount, status, utr, created_at)
-            VALUES (?, ?, NULL, 850.0, 'SUCCESS', 'PAYTM1092837465', ?),
-                   (?, ?, NULL, 850.0, 'SUCCESS', 'PAYTM8472910384', ?)
-        """, (f"tx_{merchant_id}_1", merchant_id, now_iso(), f"tx_{merchant_id}_2", merchant_id, now_iso()))
-        cur.execute("""
-            INSERT OR REPLACE INTO devices (id, merchant_id, type, status)
-            VALUES (?, ?, 'SOUNDBOX', 'ONLINE')
-        """, (f"dev_{merchant_id}", merchant_id))
         conn.commit()
 
     # Extract numeric amount if mentioned
@@ -711,15 +754,15 @@ async def receive_meta_whatsapp(request: Request):
         except Exception:
             amount_val = None
 
-    # Ensure merchant always has an active settlement batch in the test ledger
+    # Ensure merchant has at least one pending settlement matching or ready
     cur.execute("SELECT id, amount, status FROM settlements WHERE merchant_id = ? ORDER BY created_at DESC LIMIT 1", (merchant_id,))
     stl_row = cur.fetchone()
     if not stl_row:
         cur.execute("""
             INSERT INTO settlements (id, merchant_id, ticket_id, amount, status, reason, utr, retry_count, created_at)
             VALUES (?, ?, NULL, ?, 'INITIATED', 'BANK_FILE_PENDING', NULL, 0, ?)
-        """, (f"stl_{merchant_id}_{uuid.uuid4().hex[:4]}", merchant_id, amount_val or 14280.0, now_iso()))
-    elif amount_val and stl_row["status"] == "INITIATED":
+        """, (f"stl_{merchant_id}_{uuid.uuid4().hex[:4]}", merchant_id, amount_val or 12000.0, now_iso()))
+    elif amount_val and stl_row["status"] in ["INITIATED", "RETRY_REQUESTED"]:
         cur.execute("UPDATE settlements SET amount = ? WHERE id = ?", (amount_val, stl_row["id"]))
 
     # Generate new Ticket ID
@@ -732,18 +775,102 @@ async def receive_meta_whatsapp(request: Request):
     conn.commit()
     conn.close()
 
-    # Execute full Resolve OS lifecycle, passing clean_phone so the reply goes back to their WhatsApp!
-    try:
-        run_res = run_desk(ticket_id=ticket_id, request=None, recipient_phone=clean_phone)
-        return {
-            "status": "success",
-            "ticket_id": ticket_id,
-            "decision": run_res.status,
-            "reason_code": run_res.reason_code,
-            "sender_phone": clean_phone
-        }
-    except Exception as e:
-        print(f"Error processing WhatsApp ticket {ticket_id}: {e}")
-        return {"status": "error", "error": str(e), "ticket_id": ticket_id}
+    # 4. Dispatch autonomous Resolve OS run via BackgroundTasks (Fast 200 to Meta)
+    background_tasks.add_task(run_desk, ticket_id=ticket_id, request=None, recipient_phone=clean_phone)
+
+    return {
+        "status": "success",
+        "ticket_id": ticket_id,
+        "decision": "ACCEPTED",
+        "sender_phone": clean_phone
+    }
+
+
+@app.post("/api/tickets/{ticket_id}/approve")
+def approve_ticket(ticket_id: str):
+    """
+    Operator action: Approve an escalated ticket or manual override.
+    """
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM tickets WHERE id = ?", (ticket_id,))
+    ticket = cur.fetchone()
+    if not ticket:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    cur.execute("SELECT * FROM merchants WHERE id = ?", (ticket["merchant_id"],))
+    m_row = cur.fetchone()
+    merchant = dict(m_row) if m_row else {}
+
+    # Find pending settlement to confirm
+    cur.execute("SELECT id FROM settlements WHERE merchant_id = ? AND status != 'SUCCESS' ORDER BY created_at DESC LIMIT 1", (ticket["merchant_id"],))
+    stl = cur.fetchone()
+    if stl:
+        execute_confirm_settlement(stl["id"], ticket_id)
+
+    execute_update_ticket(ticket_id, "RESOLVED")
+    log_audit(ticket_id, "HUMAN_OPS", "ACTED", {"tool": "human_override_approve", "note": "Operator manually approved ticket override."}, "HUMAN_APPROVED", None, 100)
+
+    phone = merchant.get("phone")
+    if phone:
+        execute_send_whatsapp(ticket_id, "ticket_approved", {"merchant_name": merchant.get("name", "Merchant"), "ticket_id": ticket_id}, recipient_phone=phone)
+
+    conn.close()
+    return {"status": "approved", "ticket_id": ticket_id}
+
+
+@app.post("/api/tickets/{ticket_id}/reject")
+def reject_ticket(ticket_id: str):
+    """
+    Operator action: Reject an escalated ticket.
+    """
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM tickets WHERE id = ?", (ticket_id,))
+    ticket = cur.fetchone()
+    if not ticket:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    cur.execute("SELECT * FROM merchants WHERE id = ?", (ticket["merchant_id"],))
+    m_row = cur.fetchone()
+    merchant = dict(m_row) if m_row else {}
+
+    execute_update_ticket(ticket_id, "CLOSED_REJECTED")
+    log_audit(ticket_id, "HUMAN_OPS", "ACTED", {"tool": "human_override_reject", "note": "Operator rejected ticket after risk review."}, "HUMAN_REJECTED", None, 100)
+
+    phone = merchant.get("phone")
+    if phone:
+        execute_send_whatsapp(ticket_id, "ticket_rejected", {"merchant_name": merchant.get("name", "Merchant"), "ticket_id": ticket_id}, recipient_phone=phone)
+
+    conn.close()
+    return {"status": "rejected", "ticket_id": ticket_id}
+
+
+@app.post("/api/demo/confirm-settlement")
+def demo_confirm_settlement(body: Dict[str, Any] = None):
+    """
+    Demo Tool: Simulates bank file reconciliation callback.
+    Transitions a RETRY_REQUESTED or INITIATED settlement batch to SUCCESS and issues genuine UTR.
+    """
+    body = body or {}
+    batch_id = body.get("batch_id")
+    conn = get_db()
+    cur = conn.cursor()
+    if not batch_id:
+        cur.execute("SELECT id FROM settlements WHERE status = 'RETRY_REQUESTED' ORDER BY created_at DESC LIMIT 1")
+        row = cur.fetchone()
+        if not row:
+            cur.execute("SELECT id FROM settlements WHERE status = 'INITIATED' ORDER BY created_at DESC LIMIT 1")
+            row = cur.fetchone()
+        if not row:
+            conn.close()
+            return {"status": "no_pending_settlement"}
+        batch_id = row["id"]
+
+    conn.close()
+    result = execute_confirm_settlement(batch_id)
+    return {"status": "success", "result": result}
 
 

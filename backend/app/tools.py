@@ -49,6 +49,18 @@ WHATSAPP_TEMPLATES = {
         "Namaste {merchant_name}, Resolve OS here. Aapka koi pending settlement record nahi mila. "
         "Aapka case manual verification ke liye Ops desk ko transfer kiya gaya hai. Ticket {ticket_id}."
     ),
+    "clarify_unknown_intent": (
+        "Namaste {merchant_name}, Resolve OS here. Hum aapki query samajh nahi paaye. "
+        "Kripya batayein: settlement status check, refund query, ya QR/soundbox issue? (Ticket {ticket_id})"
+    ),
+    "ticket_rejected": (
+        "Namaste {merchant_name}, Resolve OS here. Aapka ticket {ticket_id} review ke baad close kar diya gaya hai. "
+        "Sahayata ke liye merchant helpline par call karein."
+    ),
+    "ticket_approved": (
+        "Namaste {merchant_name}, Resolve OS here. Supervisor review complete. "
+        "Ticket {ticket_id} approve ho gaya hai aur settlement processing shuru kar di gayi hai."
+    ),
 }
 
 
@@ -65,7 +77,6 @@ def log_audit(ticket_id: str, actor: str, event_type: str, payload: dict, reason
 def execute_retry_settlement_file(ticket_id: str, batch_id: str, policy_token: str) -> Dict[str, Any]:
     conn = get_db()
     cur = conn.cursor()
-    # Generate mock bank UTR
     utr = f"PAYTM{random.randint(1000000000, 9999999999)}"
     cur.execute("""
         UPDATE settlements
@@ -78,8 +89,27 @@ def execute_retry_settlement_file(ticket_id: str, batch_id: str, policy_token: s
     conn.commit()
     conn.close()
 
-    result = {"batch_id": batch_id, "new_status": "SUCCESS", "utr": utr}
+    result = {"batch_id": batch_id, "new_status": "SUCCESS", "utr": utr, "reason": "RETRY_SUBMITTED_OK"}
     log_audit(ticket_id, "N8N", "ACTED", {"tool": "retry_settlement_file", "result": result}, "SETTLEMENT_RETRY_OK", policy_token, 412)
+    return result
+
+def execute_confirm_settlement(batch_id: str, ticket_id: str = None) -> Dict[str, Any]:
+    conn = get_db()
+    cur = conn.cursor()
+    utr = f"PAYTM{random.randint(1000000000, 9999999999)}"
+    cur.execute("""
+        UPDATE settlements
+        SET status = 'SUCCESS',
+            reason = 'BANK_ACK_CONFIRMED',
+            utr = ?
+        WHERE id = ?
+    """, (utr, batch_id))
+    conn.commit()
+    conn.close()
+
+    result = {"batch_id": batch_id, "new_status": "SUCCESS", "utr": utr, "reason": "BANK_ACK_CONFIRMED"}
+    if ticket_id:
+        log_audit(ticket_id, "N8N", "ACTED", {"tool": "confirm_settlement", "result": result}, "BANK_ACK_CONFIRMED", None, 250)
     return result
 
 def send_meta_whatsapp_message(to_phone: str, message_body: str) -> bool:

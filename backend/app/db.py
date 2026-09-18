@@ -141,6 +141,11 @@ def init_db(conn=None):
         payload_json TEXT,
         created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS processed_messages (
+        msg_id TEXT PRIMARY KEY,
+        created_at TEXT NOT NULL
+    );
     """)
     cur.execute("PRAGMA table_info(merchants);")
     cols = [r["name"] for r in cur.fetchall()]
