@@ -38,6 +38,19 @@ def evaluate_policy(plan: SarvamPlan, db_state: Dict[str, Any]) -> PolicyDecisio
     transactions = db_state.get("transactions", [])
     ticket_id = ticket.get("id", "T-UNKNOWN")
 
+    # 0. Handle greetings and general inquiries without running risk/settlement checks
+    if plan.intent == "GREETING":
+        token = generate_policy_token(ticket_id, "reply_greeting", "GREETING_ACK")
+        return PolicyDecision(
+            allowed=True,
+            action="reply_greeting",
+            reason_code="GREETING_ACK",
+            policy_token=token,
+            explanation="Merchant greeting acknowledged. No financial actions required.",
+            next_ticket_status="RESOLVED",
+            args={}
+        )
+
     # 1. Check merchant level risk flags or memory risk flags
     merchant_risk = merchant.get("risk_flag")
     memory_risks = db_state.get("memory_risk_flags", [])

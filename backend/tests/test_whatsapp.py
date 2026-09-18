@@ -74,3 +74,62 @@ def test_meta_whatsapp_incoming_message():
     assert ticket["channel"] == "WhatsApp"
     assert ticket["status"] == "RESOLVED"
     conn.close()
+
+
+def test_meta_whatsapp_greeting_message():
+    greeting_payload = {
+        "object": "whatsapp_business_account",
+        "entry": [
+            {
+                "id": "123456789",
+                "changes": [
+                    {
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {
+                                "display_phone_number": "15550234567",
+                                "phone_number_id": "10001"
+                            },
+                            "contacts": [
+                                {
+                                    "profile": {"name": "Sparsh Singh"},
+                                    "wa_id": "919988776655"
+                                }
+                            ],
+                            "messages": [
+                                {
+                                    "from": "919988776655",
+                                    "id": "wamid.GREET_01",
+                                    "timestamp": "1726700000",
+                                    "text": {
+                                        "body": "hello kaise ho aap"
+                                    },
+                                    "type": "text"
+                                }
+                            ]
+                        },
+                        "field": "messages"
+                    }
+                ]
+            }
+        ]
+    }
+
+    res = client.post("/api/webhook/whatsapp", json=greeting_payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["decision"] == "RESOLVED"
+    assert data["reason_code"] == "GREETING_ACK"
+
+    # Check merchant Sparsh was created dynamically and NOT Sharma Kirana
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM tickets WHERE id = ?", (data["ticket_id"],))
+    ticket = cur.fetchone()
+    assert ticket["merchant_id"] != "m_2041"
+    cur.execute("SELECT name FROM merchants WHERE id = ?", (ticket["merchant_id"],))
+    merchant = cur.fetchone()
+    assert merchant["name"] == "Sparsh Singh"
+    conn.close()
+

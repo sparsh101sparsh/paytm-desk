@@ -10,7 +10,7 @@ from .db import get_db, now_iso
 
 WHATSAPP_TEMPLATES = {
     "settlement_retry_sent": (
-        "Namaste Sharma ji, Resolve OS here. Aapka settlement batch {batch_id} "
+        "Namaste {merchant_name}, Resolve OS here. Aapka settlement batch {batch_id} "
         "bank file mein atka tha. Humne dubara push kar diya hai. 2 ghante mein check karein. Ticket {ticket_id}."
     ),
     "ask_utr": (
@@ -24,6 +24,15 @@ WHATSAPP_TEMPLATES = {
     "refund_initiated": (
         "Namaste {merchant_name}, Resolve OS here. Aapke customer ka refund ₹{amount} "
         "process ho gaya hai. 2-3 business days mein credit hoga. Ticket {ticket_id}."
+    ),
+    "greeting_ack": (
+        "Namaste {merchant_name}! 🙏 Main Resolve OS hoon — aapka automated merchant operations teammate. "
+        "Main settlement status check, bank retry, aur customer refund issues turant resolve kar sakta hoon. "
+        "Aap apni query ya settlement amount batayein."
+    ),
+    "settlement_already_settled": (
+        "Namaste {merchant_name}, Resolve OS here. Aapka settlement batch {batch_id} (₹{amount}) "
+        "bank se pehle hi SUCCESSFULLY transfer ho chuka hai (UTR: {utr}). Kripya bank statement check karein. Ticket {ticket_id}."
     ),
 }
 
