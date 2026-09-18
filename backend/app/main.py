@@ -1,6 +1,6 @@
 """
-FastAPI application for ResolveOS.
-Paytm Intelligence teammate for merchant support.
+FastAPI application for DESK — Paytm Intelligence Teammate.
+Merchant support operations engine.
 "Sarvam proposes. Policy decides. n8n acts. Cognee remembers."
 """
 import os
@@ -27,7 +27,8 @@ from .tools import (
 
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "")
 
-app = FastAPI(title="ResolveOS - Paytm Merchant Support Teammate", version="1.0.0")
+app = FastAPI(title="DESK — Paytm Intelligence Teammate", version="1.0.0")
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -137,7 +138,7 @@ def get_ticket_events(ticket_id: str):
 @app.post("/api/tickets/{ticket_id}/run", response_model=RunResponse)
 def run_desk(ticket_id: str, request: Request = None):
     """
-    Runs the full ResolveOS lifecycle:
+    Runs the full DESK lifecycle:
     1. Check N8N_WEBHOOK_URL if external orchestrator is active
     2. Sarvam / Fixture planner (Intent & Plan proposal) -> Audit: UNDERSTOOD
     3. Cognee memory search -> Audit: RECALLED

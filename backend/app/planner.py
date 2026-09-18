@@ -1,5 +1,5 @@
 """
-Sarvam planner client for ResolveOS.
+Sarvam planner client for DESK — Paytm Intelligence Teammate.
 Calls Sarvam 105b for Hinglish understanding and structured plan proposal.
 Falls back to deterministic DB-state fixture planner only if SARVAM_API_KEY is missing.
 Logs raw prompt/response and actor in audit_events.
@@ -14,7 +14,7 @@ SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "")
 SARVAM_MODEL = os.getenv("SARVAM_MODEL", "sarvam-105b")
 SARVAM_ENDPOINT = "https://api.sarvam.ai/v1/chat/completions"
 
-SYSTEM_PROMPT = """You are ResolveOS, an autonomous Paytm Merchant Support operations teammate.
+SYSTEM_PROMPT = """You are DESK, a Paytm Intelligence Teammate for merchant support operations.
 Think briefly. Analyze the merchant ticket and context. Return ONLY a valid JSON object with the following structure:
 {
   "intent": "SETTLEMENT_MISSING | PAYMENT_NOT_RECEIVED | REFUND_STATUS | QR_DOWN | DEVICE_ISSUE | UNKNOWN",
@@ -31,6 +31,7 @@ Rules:
 - Propose actions only; Policy executes.
 - Output pure JSON only.
 """
+
 
 def generate_plan(db_state: Dict[str, Any]) -> Tuple[SarvamPlan, str, int]:
     """
@@ -148,15 +149,44 @@ Current Transactions in DB: {json.dumps(transactions)}
         )
         return plan, "FIXTURE", 90
 
-    # Case 3: Unknown
+    # Case 3: Device issue (Soundbox offline / announcement not working)
+    if any(kw in text_lower for kw in ["soundbox", "device", "announcement", "sound"]):
+        plan = SarvamPlan(
+            intent="DEVICE_ISSUE",
+            confidence=0.88,
+            summary_en="Merchant reports Soundbox device issue. Requires device ops review.",
+            summary_hi="Soundbox announcement nahi aa rahi. Device ops ko escalate karna hoga.",
+            proposed_reads=[PlanRead(tool="get_device", args={"merchant_id": merchant_id})],
+            proposed_writes=[],
+            needs_human=True,
+            human_reason="Device issues require field ops or hardware replacement — cannot be resolved autonomously."
+        )
+        return plan, "FIXTURE", 75
+
+    # Case 4: QR issue (damaged standee, QR not working)
+    if any(kw in text_lower for kw in ["qr", "standee", "scan"]):
+        plan = SarvamPlan(
+            intent="QR_DOWN",
+            confidence=0.85,
+            summary_en="Merchant reports QR standee damage or scanning issue. Logistics required.",
+            summary_hi="QR standee damage hua hai. Nayi standee bhejni hogi.",
+            proposed_reads=[PlanRead(tool="get_device", args={"merchant_id": merchant_id})],
+            proposed_writes=[],
+            needs_human=True,
+            human_reason="QR standee replacement requires physical logistics — cannot be resolved autonomously."
+        )
+        return plan, "FIXTURE", 78
+
+    # Case 5: Unknown intent — safe escalation
     plan = SarvamPlan(
         intent="UNKNOWN",
         confidence=0.50,
-        summary_en="General inquiry or unclassified issue.",
-        summary_hi="General poochtaach ya anjaan vishay.",
+        summary_en="General inquiry or unclassified issue. Routing to human ops.",
+        summary_hi="General poochtaach ya anjaan vishay. Human ops ko transfer kiya.",
         proposed_reads=[],
         proposed_writes=[],
         needs_human=True,
-        human_reason="Unrecognized intent requires human operations triage."
+        human_reason="Unrecognized intent — safe default is human triage, not autonomous action."
     )
     return plan, "FIXTURE", 80
+

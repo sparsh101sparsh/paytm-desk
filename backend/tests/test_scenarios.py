@@ -1,5 +1,5 @@
 """
-Scenario integration tests for ResolveOS.
+Scenario integration tests for DESK — Paytm Intelligence Teammate.
 Tests the 3 hero scenarios end-to-end against real SQLite DB.
 Verifies dynamic state-based execution: editing settlement amount to 60,000 blocks retry.
 """

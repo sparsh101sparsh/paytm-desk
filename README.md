@@ -1,86 +1,103 @@
-# ResolveOS — Paytm Intelligence Teammate for Merchant Support
+# DESK — Paytm Intelligence Teammate for Merchant Support
 
 > **Track:** Autonomous AI Teammates  
 > **Event:** Paytm ♥ AI Hackathon · Delhi · 19 September 2026  
-> **Pitch Line:** *Sarvam proposes. Policy decides. n8n acts. Cognee remembers.*
+> **Pitch Line:** *Sarvam proposes. Policy decides. n8n acts. Cognee remembers.*  
+> **Live:** https://paytm-desk.vercel.app  
+> **GitHub:** https://github.com/sparsh101sparsh/paytm-desk
 
 ---
 
-## What is ResolveOS?
-ResolveOS is an autonomous AI operations teammate built inside the **Paytm for Business** ecosystem. It resolves Hinglish merchant disputes over settlements and refunds end-to-end:
-- **Sarvam (`sarvam-105b`)**: Comprehends Hinglish merchant tickets and proposes structured action plans.
-- **Cognee**: Recalls merchant history, settlement status, and operational SOPs from a knowledge graph.
-- **Deterministic Policy**: Non-LLM rule engine strictly enforcing financial risk limits (e.g. max ₹50k retry limit, AML freeze checks).
-- **n8n**: Workflow automation runtime executing tools (retrying gateway batches, updating tickets, sending WhatsApp messages).
+## What is DESK?
 
-> **Honest Line:** Paytm core banking systems are simulated in our SQLite database; Sarvam, Cognee, n8n, and our policy engine are completely real and live.
+DESK is an autonomous AI operations teammate built inside the **Paytm for Business** ecosystem. When a merchant sends a Hinglish WhatsApp message about a stuck settlement or missing refund, DESK reads it, checks whether acting is safe using fixed rules, and either fixes it, asks for missing info, or escalates to a human. The AI suggests. The rules decide. It never moves money on its own.
+
+### Stack (Honest)
+
+| Component | Role | Status |
+|---|---|---|
+| **Sarvam (`sarvam-105b`)** | Understands Hinglish tickets, proposes structured action plans | ✅ Live API |
+| **Deterministic Policy Engine** | Non-LLM rule engine enforcing financial risk limits (₹50k cap, AML freeze checks, retry guards) | ✅ Real code + tests |
+| **FastAPI + SQLite backend** | Executes approved tools, writes every action to audit log | ✅ Live on Vercel |
+| **n8n workflow** | Importable workflow JSON showing the execution graph (`n8n/desk-merchant-ticket.json`) | ✅ JSON importable (not wired to Vercel — run locally to see live nodes) |
+| **Cognee memory** | Merchant history recalled per-run via SQLite audit history (`COGNEE_OPTIONAL=1`) | ⚠️ Simulated in SQLite |
+| **Paytm ledger** | Settlement, refund, transaction data | ✅ Seeded test data (labeled TEST DATA) |
+
+> **Honest Line:** Sarvam and the policy engine are live. n8n ships as an importable workflow JSON — import it locally to watch nodes execute. Cognee is simulated using our own audit history (real Cognee integration is the next step). Paytm core banking APIs are not accessible, so the ledger is SQLite test data.
 
 ---
 
 ## Three Hero Scenarios (Tested & Proven)
 
-| Ticket ID | Merchant | Issue Context | Autonomous Policy Decision | Real Outcome in DB |
+| Ticket ID | Merchant | Issue | Policy Decision | DB Outcome |
 |---|---|---|---|---|
-| **T-1042** | Sharma Kirana (Karol Bagh) | Settlement ₹14,280 stuck `INITIATED` without UTR | `SETTLEMENT_RETRY_OK` | Batch retried, UTR assigned, WhatsApp sent, Ticket `RESOLVED`. |
-| **T-1048** | Glow Salon (Lajpat Nagar) | Refund ₹850 requested across 3 ambiguous txns | `ASK_MERCHANT_UTR` | Zero refunds created, Ticket `WAITING_ON_MERCHANT`, WhatsApp sent asking for UTR. |
-| **T-1055** | Delhi Electronics (Nehru Place) | Settlement ₹1,84,000 failed + `ACCOUNT_FROZEN_SUSPECT` | `ESCALATE_RISK` | Zero retries attempted, Ticket `ESCALATED`, 6-line brief dispatched to `RISK_OPS`. |
+| **T-1042** | Sharma Kirana (Karol Bagh) | Settlement ₹14,280 stuck `INITIATED` without UTR | `SETTLEMENT_RETRY_OK` | Batch retried, UTR assigned, WhatsApp sent, Ticket `RESOLVED` |
+| **T-1048** | Glow Salon (Lajpat Nagar) | Refund ₹850 across 3 ambiguous txns, no UTR | `ASK_MERCHANT_UTR` | Zero refunds created, Ticket `WAITING_ON_MERCHANT`, WhatsApp asks for UTR |
+| **T-1055** | Delhi Electronics (Nehru Place) | Settlement ₹1,84,000 + `ACCOUNT_FROZEN_SUSPECT` | `ESCALATE_RISK` | Zero retries, Ticket `ESCALATED`, 6-line brief dispatched to `RISK_OPS` |
 
-**Anti-Cheat / Anti-Hardcoding Verification:**
-If you edit the settlement amount in SQLite for T-1042 to ₹60,000, ResolveOS immediately denies the auto-retry with `SETTLEMENT_RETRY_DENIED_AMOUNT` and escalates. There are zero `if (ticketId === "T-1042")` statements anywhere in the codebase.
+**Anti-Hardcoding Verification:**  
+Edit the settlement amount in SQLite for T-1042 to ₹60,000, run it again → DESK denies with `SETTLEMENT_RETRY_DENIED_AMOUNT` and escalates. Zero `if (ticketId === "T-1042")` anywhere in the codebase. The decision comes from data, not ticket ID.
 
 ---
 
-## Quickstart
+## Quickstart (Local)
 
 ### 1. Requirements
 - Python 3.10+
 - Node.js 18+ & npm
 - SQLite3
 
-### 2. Backend Setup
+### 2. Backend
 ```bash
 # In project root:
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt # or: pip install fastapi uvicorn pydantic pytest httpx
+pip install -r requirements.txt
 
-# Seed database with the 3 hero tickets & merchants:
+# Seed database:
 python -m backend.app.seed
 
-# Run FastAPI backend server (Port 8000):
+# Run FastAPI (Port 8000):
 uvicorn backend.app.main:app --reload --port 8000
 ```
 
-### 3. Frontend Setup
+### 3. Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
-# Open http://localhost:3000 in your browser
+# Open http://localhost:3000
 ```
 
-### 4. Running n8n Workflow (Optional / Judge Demonstration)
-1. Start n8n locally:
-   ```bash
-   npx n8n
-   # or docker run -it --rm --name n8n -p 5678:5678 docker.n8n.io/n8nio/n8n
-   ```
-2. In n8n (`http://localhost:5678`), click **Add Workflow** -> **Import from File**.
-3. Select `n8n/desk-merchant-ticket.json`.
-4. Click **Publish / Activate**. Set `N8N_WEBHOOK_URL` in `.env` if using live webhook trigger.
-5. In the UI, click **n8n Canvas Peek** to watch the workflow execution nodes light up green!
+### 4. n8n Workflow (Judge Demo — Import Locally)
+```bash
+# Start n8n:
+npx n8n
+# or: docker run -it --rm --name n8n -p 5678:5678 docker.n8n.io/n8nio/n8n
+```
+1. In n8n (`http://localhost:5678`), click **Add Workflow → Import from File**
+2. Select `n8n/desk-merchant-ticket.json`
+3. Activate the workflow — nodes will go green as tickets are processed
+4. Set `N8N_WEBHOOK_URL=http://localhost:5678/webhook/desk-run` in `.env` to wire it to the backend
+
+### 5. Sarvam API Key
+Create a `.env` file (copy `.env.example`) and add your key:
+```
+SARVAM_API_KEY=your_key_here
+```
+Without a key, DESK falls back to a deterministic fixture planner — all 3 demo tickets still work.
 
 ---
 
-## Automated Verification & Tests
-
-Run all unit and scenario tests to verify complete adherence to specifications:
+## Run Tests
 
 ```bash
 PYTHONPATH=. .venv/bin/pytest backend/tests/test_policy.py backend/tests/test_scenarios.py -v
 ```
 
-### Inspecting Database State
+Tests cover: all policy branches, T-1042 auto-resolve, T-1048 ask-for-UTR, T-1055 escalate, and the anti-hardcoding mutation proof.
+
+### Inspect Database State
 ```bash
 sqlite3 backend/desk.db "SELECT id, status, n8n_execution_id FROM tickets;"
 sqlite3 backend/desk.db "SELECT id, amount, status, utr, retry_count FROM settlements;"
@@ -91,17 +108,17 @@ sqlite3 backend/desk.db "SELECT actor, type, reason_code, policy_token FROM audi
 
 ---
 
-## Resetting Demo State
-Click the **Reset demo** button on the UI, or execute:
+## Reset Demo State
+Click **Reset demo** in the UI, or:
 ```bash
 curl -X POST http://localhost:8000/demo/reset
+# or on Vercel:
+curl -X POST https://paytm-desk.vercel.app/api/demo/reset
 ```
-This restores all SQLite tables to the exact starting state.
 
 ---
 
 ## Built with Ponytail Principles
-This project implements the [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail) engineering discipline:
 - Zero unnecessary dependencies or bloated ORMs (clean stdlib SQLite3).
 - Native browser components and raw Tailwind design tokens matching Paytm for Business.
-- Shortest working diffs, clean functions, and 100% test coverage.
+- Shortest working diffs, clean functions, test coverage across all 3 hero scenarios.

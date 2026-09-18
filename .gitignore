@@ -13,3 +13,6 @@ __pycache__/
 # Note: Keep desk.db untracked or tracked if preferred, but seed creates it dynamically
 *.db-journal
 .vercel
+
+# Secrets — never commit API keys
+.env

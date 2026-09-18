@@ -1,5 +1,5 @@
 """
-Database seed script for ResolveOS.
+Database seed script for DESK.
 Reads data from /data JSON files and initializes SQLite tables.
 Resets the demo state to original hero scenarios.
 """

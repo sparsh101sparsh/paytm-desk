@@ -1,5 +1,5 @@
 """
-SQLite database engine for ResolveOS.
+SQLite database engine for DESK.
 Follows ponytail principles: clean stdlib sqlite3, zero ORM bloat, explicit schema.
 Source of truth for all ticket state, settlements, audit events, and WhatsApp outbox.
 """
