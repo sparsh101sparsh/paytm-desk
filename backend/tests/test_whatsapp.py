@@ -133,3 +133,61 @@ def test_meta_whatsapp_greeting_message():
     assert merchant["name"] == "Sparsh Singh"
     conn.close()
 
+
+def test_meta_whatsapp_payment_not_received_hinglish():
+    payload = {
+        "object": "whatsapp_business_account",
+        "entry": [
+            {
+                "id": "123456789",
+                "changes": [
+                    {
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {
+                                "display_phone_number": "15550234567",
+                                "phone_number_id": "10001"
+                            },
+                            "contacts": [
+                                {
+                                    "profile": {"name": "Sparsh"},
+                                    "wa_id": "919876543210"
+                                }
+                            ],
+                            "messages": [
+                                {
+                                    "from": "919876543210",
+                                    "id": "wamid.PAY12K_01",
+                                    "timestamp": "1726700000",
+                                    "text": {
+                                        "body": "mera 12000 k payment phasa hua h aaya nai aaj aajana chaiye tha"
+                                    },
+                                    "type": "text"
+                                }
+                            ]
+                        },
+                        "field": "messages"
+                    }
+                ]
+            }
+        ]
+    }
+
+    res = client.post("/api/webhook/whatsapp", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["decision"] == "RESOLVED"
+    assert data["reason_code"] == "SETTLEMENT_RETRY_OK"
+
+    # Verify settlement batch amount was updated to ₹12,000 and status is SUCCESS
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT amount, status, utr FROM settlements WHERE merchant_id = 'm_me'")
+    settlement = cur.fetchone()
+    assert settlement is not None
+    assert settlement["amount"] == 12000.0
+    assert settlement["status"] == "SUCCESS"
+    assert settlement["utr"] is not None
+    conn.close()
+

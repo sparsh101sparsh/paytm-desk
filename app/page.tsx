@@ -168,6 +168,8 @@ export default function ResolveOS() {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const knownTicketIdsRef = useRef<Set<string>>(new Set());
+  const isInitialLoadRef = useRef<boolean>(true);
 
   // ─── Data Loading ──────────────────────────────────────────────────────────
 
@@ -193,6 +195,22 @@ export default function ResolveOS() {
         const data: Ticket[] = await res.json();
         setTickets(data);
         setApiError(false);
+
+        if (isInitialLoadRef.current) {
+          isInitialLoadRef.current = false;
+          knownTicketIdsRef.current = new Set(data.map((t) => t.id));
+        } else {
+          // Find any newly arrived WhatsApp ticket
+          const newWaTicket = data.find(
+            (t) => (t.id.startsWith("T-WA") || t.channel === "WhatsApp") && !knownTicketIdsRef.current.has(t.id)
+          );
+          if (newWaTicket) {
+            setSelectedId(newWaTicket.id);
+            setActiveTab((prev) => (prev === "hero" ? "whatsapp" : prev));
+            showToast("info", `New WhatsApp message: ${newWaTicket.merchant_name || newWaTicket.id}`);
+          }
+          knownTicketIdsRef.current = new Set(data.map((t) => t.id));
+        }
       }
     } catch {
       setApiError(true);
@@ -588,10 +606,17 @@ export default function ResolveOS() {
     },
   ];
 
+  const heroCount = useMemo(() => tickets.filter((t) => heroIds.includes(t.id)).length, [tickets, heroIds]);
+  const waCount = useMemo(
+    () => tickets.filter((t) => t.id.startsWith("T-WA") || (t.channel === "WhatsApp" && !heroIds.includes(t.id))).length,
+    [tickets, heroIds]
+  );
+  const allCount = tickets.length;
+
   const TAB_ITEMS = [
-    { id: "hero", label: "Hero demo" },
-    { id: "whatsapp", label: "WhatsApp live" },
-    { id: "all", label: "All" },
+    { id: "hero", label: "Hero demo", count: heroCount },
+    { id: "whatsapp", label: "WhatsApp live", count: waCount },
+    { id: "all", label: "All", count: allCount },
   ] as const;
 
   return (
@@ -894,7 +919,7 @@ export default function ResolveOS() {
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
                   onMouseEnter={() => setHoveredTab(tab.id)}
-                  className={`relative z-10 flex-1 py-1.5 text-center text-xs font-medium rounded-md transition-colors duration-150 flex items-center justify-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00BAF2] cursor-pointer ${
+                  className={`relative z-10 flex-1 py-1.5 text-center text-xs font-medium rounded-md transition-colors duration-150 flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00BAF2] cursor-pointer ${
                     hasPill ? "text-white" : "text-slate-500 hover:text-slate-800"
                   }`}
                 >
@@ -902,6 +927,13 @@ export default function ResolveOS() {
                     <span className="size-1.5 rounded-full bg-[#00BAF2] animate-pulse shrink-0" />
                   )}
                   <span>{tab.label}</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold tabular-nums leading-none ${
+                      hasPill ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
                 </button>
               );
             })}

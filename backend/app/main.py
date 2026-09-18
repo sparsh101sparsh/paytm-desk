@@ -460,7 +460,6 @@ def run_desk(ticket_id: str, request: Request = None, recipient_phone: Optional[
         }
         execute_assign_human(ticket_id, "RISK_OPS", brief_info, decision.policy_token)
         if recipient_phone:
-            # If already settled, give precise numbers and UTR rather than generic risk message
             if decision.reason_code == "SETTLEMENT_RETRY_DENIED_STATUS" and settlements and settlements[0].get("status") == "SUCCESS":
                 stl = settlements[0]
                 execute_send_whatsapp(
@@ -473,6 +472,13 @@ def run_desk(ticket_id: str, request: Request = None, recipient_phone: Optional[
                         "utr": stl.get("utr") or "PAYTM9817263541",
                         "ticket_id": ticket_id
                     },
+                    recipient_phone=recipient_phone
+                )
+            elif decision.reason_code == "SETTLEMENT_NOT_FOUND":
+                execute_send_whatsapp(
+                    ticket_id=ticket_id,
+                    template_id="settlement_not_found",
+                    variables={"merchant_name": merchant.get("name", "Merchant"), "ticket_id": ticket_id},
                     recipient_phone=recipient_phone
                 )
             else:
@@ -704,6 +710,17 @@ async def receive_meta_whatsapp(request: Request):
             amount_val = float(all_amounts[-1].replace(",", ""))
         except Exception:
             amount_val = None
+
+    # Ensure merchant always has an active settlement batch in the test ledger
+    cur.execute("SELECT id, amount, status FROM settlements WHERE merchant_id = ? ORDER BY created_at DESC LIMIT 1", (merchant_id,))
+    stl_row = cur.fetchone()
+    if not stl_row:
+        cur.execute("""
+            INSERT INTO settlements (id, merchant_id, ticket_id, amount, status, reason, utr, retry_count, created_at)
+            VALUES (?, ?, NULL, ?, 'INITIATED', 'BANK_FILE_PENDING', NULL, 0, ?)
+        """, (f"stl_{merchant_id}_{uuid.uuid4().hex[:4]}", merchant_id, amount_val or 14280.0, now_iso()))
+    elif amount_val and stl_row["status"] == "INITIATED":
+        cur.execute("UPDATE settlements SET amount = ? WHERE id = ?", (amount_val, stl_row["id"]))
 
     # Generate new Ticket ID
     ticket_id = f"T-WA{uuid.uuid4().hex[:6].upper()}"

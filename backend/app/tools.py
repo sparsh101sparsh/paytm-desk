@@ -45,6 +45,10 @@ WHATSAPP_TEMPLATES = {
         "Namaste {merchant_name}, Resolve OS here. QR standee issue ko Logistics team ko "
         "escalate kiya gaya hai. Ticket {ticket_id}."
     ),
+    "settlement_not_found": (
+        "Namaste {merchant_name}, Resolve OS here. Aapka koi pending settlement record nahi mila. "
+        "Aapka case manual verification ke liye Ops desk ko transfer kiya gaya hai. Ticket {ticket_id}."
+    ),
 }
 
 

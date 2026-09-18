@@ -105,15 +105,27 @@ def evaluate_policy(plan: SarvamPlan, db_state: Dict[str, Any]) -> PolicyDecisio
         )
 
     # 2. Check proposed settlement retries
-    # Settlement retry only applies when intent is SETTLEMENT_MISSING or explicitly proposed
+    # Settlement retry applies when intent is SETTLEMENT_MISSING or PAYMENT_NOT_RECEIVED or explicitly proposed
     proposed_write_actions = [w.action for w in plan.proposed_writes]
-    is_settlement_case = plan.intent == "SETTLEMENT_MISSING" or (
+    is_settlement_case = plan.intent in ["SETTLEMENT_MISSING", "PAYMENT_NOT_RECEIVED"] or (
         "retry_settlement_file" in proposed_write_actions and plan.intent not in [
             "REFUND_STATUS", "QR_DOWN", "DEVICE_ISSUE", "AMBIGUOUS_AMOUNT", "GREETING"
         ]
     )
 
-    if is_settlement_case and settlements:
+    if is_settlement_case:
+        if not settlements:
+            token = generate_policy_token(ticket_id, "escalate_no_settlement", "SETTLEMENT_NOT_FOUND")
+            return PolicyDecision(
+                allowed=False,
+                action="escalate_no_settlement",
+                reason_code="SETTLEMENT_NOT_FOUND",
+                policy_token=token,
+                explanation="No settlement batch found in ledger for this merchant. Case transferred for manual investigation.",
+                next_ticket_status="ESCALATED",
+                args={}
+            )
+
         settlement = settlements[0] # primary relevant settlement
         amt = float(settlement.get("amount", 0.0))
         status = settlement.get("status", "")
