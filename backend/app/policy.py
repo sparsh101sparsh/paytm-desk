@@ -38,7 +38,7 @@ def evaluate_policy(plan: SarvamPlan, db_state: Dict[str, Any]) -> PolicyDecisio
     transactions = db_state.get("transactions", [])
     ticket_id = ticket.get("id", "T-UNKNOWN")
 
-    # 0. Handle greetings and general inquiries without running risk/settlement checks
+    # 0. Handle conversational / non-dispute intents without touching ledger
     if plan.intent == "GREETING":
         token = generate_policy_token(ticket_id, "reply_greeting", "GREETING_ACK")
         return PolicyDecision(
@@ -49,6 +49,43 @@ def evaluate_policy(plan: SarvamPlan, db_state: Dict[str, Any]) -> PolicyDecisio
             explanation="Merchant greeting acknowledged. No financial actions required.",
             next_ticket_status="RESOLVED",
             args={}
+        )
+
+    if plan.intent == "AMBIGUOUS_AMOUNT":
+        token = generate_policy_token(ticket_id, "ask_clarification", "ASK_CLARIFICATION")
+        amt = plan.amount_mentioned or ticket.get("amount") or 0.0
+        return PolicyDecision(
+            allowed=False,
+            action="ask_clarification",
+            reason_code="ASK_CLARIFICATION",
+            policy_token=token,
+            explanation=f"Bare amount ₹{amt:,.0f} mentioned without issue context. Clarification required.",
+            next_ticket_status="WAITING_ON_MERCHANT",
+            args={"amount": amt}
+        )
+
+    if plan.intent == "QR_DOWN":
+        token = generate_policy_token(ticket_id, "escalate_qr", "ESCALATE_QR_LOGISTICS")
+        return PolicyDecision(
+            allowed=False,
+            action="escalate_qr",
+            reason_code="ESCALATE_QR_LOGISTICS",
+            policy_token=token,
+            explanation="QR code standee issue requires logistics replacement. No money movement.",
+            next_ticket_status="ESCALATED",
+            args={"merchant_id": merchant.get("id")}
+        )
+
+    if plan.intent == "DEVICE_ISSUE":
+        token = generate_policy_token(ticket_id, "escalate_device", "ESCALATE_DEVICE_OPS")
+        return PolicyDecision(
+            allowed=False,
+            action="escalate_device",
+            reason_code="ESCALATE_DEVICE_OPS",
+            policy_token=token,
+            explanation="Soundbox / speaker device issue requires field operations. No money movement.",
+            next_ticket_status="ESCALATED",
+            args={"merchant_id": merchant.get("id")}
         )
 
     # 1. Check merchant level risk flags or memory risk flags
@@ -68,9 +105,13 @@ def evaluate_policy(plan: SarvamPlan, db_state: Dict[str, Any]) -> PolicyDecisio
         )
 
     # 2. Check proposed settlement retries
-    # Check if plan proposes retry_settlement_file OR if intent is SETTLEMENT_MISSING
+    # Settlement retry only applies when intent is SETTLEMENT_MISSING or explicitly proposed
     proposed_write_actions = [w.action for w in plan.proposed_writes]
-    is_settlement_case = "retry_settlement_file" in proposed_write_actions or plan.intent == "SETTLEMENT_MISSING"
+    is_settlement_case = plan.intent == "SETTLEMENT_MISSING" or (
+        "retry_settlement_file" in proposed_write_actions and plan.intent not in [
+            "REFUND_STATUS", "QR_DOWN", "DEVICE_ISSUE", "AMBIGUOUS_AMOUNT", "GREETING"
+        ]
+    )
 
     if is_settlement_case and settlements:
         settlement = settlements[0] # primary relevant settlement

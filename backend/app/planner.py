@@ -11,13 +11,13 @@ from typing import Dict, Any, Tuple
 from .schemas import SarvamPlan, PlanRead, PlanAction
 
 SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "")
-SARVAM_MODEL = os.getenv("SARVAM_MODEL", "sarvam-105b")
+SARVAM_MODEL = os.getenv("SARVAM_MODEL", "sarvam-105b-conversations")
 SARVAM_ENDPOINT = "https://api.sarvam.ai/v1/chat/completions"
 
 SYSTEM_PROMPT = """You are Resolve OS, an autonomous operations teammate for merchant support operations.
 Analyze the merchant ticket and context. Return ONLY a valid JSON object with the following structure:
 {
-  "intent": "SETTLEMENT_MISSING | PAYMENT_NOT_RECEIVED | REFUND_STATUS | QR_DOWN | DEVICE_ISSUE | GREETING | UNKNOWN",
+  "intent": "SETTLEMENT_MISSING | PAYMENT_NOT_RECEIVED | REFUND_STATUS | QR_DOWN | DEVICE_ISSUE | GREETING | AMBIGUOUS_AMOUNT | UNKNOWN",
   "confidence": 0.95,
   "summary_en": "One sentence summary in English",
   "summary_hi": "One sentence summary in Hinglish",
@@ -30,7 +30,11 @@ Analyze the merchant ticket and context. Return ONLY a valid JSON object with th
   "human_reason": null
 }
 Rules:
-- If the merchant says hello, hi, kaise ho, or asks what you can do, set intent to "GREETING", needs_human to false, proposed_writes to [], and generate a warm helpful suggested_reply_hi introducing Resolve OS.
+- If the merchant says hello, hi, kaise ho, or asks what you can do, set intent to "GREETING", needs_human to false, proposed_writes to [], and suggested_reply_hi to: "Namaste! 🙏 Main Resolve OS hoon. Aapko settlement, refund, ya QR/soundbox me kya madad chahiye?"
+- If the merchant only sent a bare number or amount (e.g. 14,280) without describing the issue, set intent to "AMBIGUOUS_AMOUNT", proposed_writes to [], and ask if it is for settlement or refund.
+- If merchant mentions refund, wapas, return, set intent to "REFUND_STATUS". If no 12-digit UTR is provided, missing_fields should be ["utr"], and do not propose immediate refund writes.
+- If merchant mentions QR not scanning or standee broken, set intent to "QR_DOWN", needs_human to true, proposed_writes to [].
+- If merchant mentions Soundbox announcement not working or offline, set intent to "DEVICE_ISSUE", needs_human to true, proposed_writes to [].
 - Never invent UTR numbers.
 - Propose actions only; Policy executes and decides based on ledger state — not on your output.
 - amount_mentioned: extract any rupee amount the merchant mentioned, or null if none.
@@ -54,6 +58,7 @@ def generate_plan(db_state: Dict[str, Any]) -> Tuple[SarvamPlan, str, int]:
     merchant_id = merchant.get("id", "")
 
     api_key = os.getenv("SARVAM_API_KEY", "") or SARVAM_API_KEY
+    model_name = os.getenv("SARVAM_MODEL", "sarvam-105b-conversations")
     if api_key:
         user_message = f"""Merchant: {merchant_name} (ID: {merchant_id})
 Ticket: {ticket_text}
@@ -69,13 +74,13 @@ Current Transactions in DB: {json.dumps(transactions)}
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": SARVAM_MODEL,
+                        "model": model_name,
                         "messages": [
                             {"role": "system", "content": SYSTEM_PROMPT},
                             {"role": "user", "content": user_message}
                         ],
                         "temperature": 0.1,
-                        "max_tokens": 4096
+                        "max_tokens": 1024
                     }
                 )
                 if res.status_code == 200:
@@ -97,45 +102,86 @@ Current Transactions in DB: {json.dumps(transactions)}
 
 
     # Deterministic DB-state fixture planner (never inspects ticket id!)
+    import re
     text_lower = ticket_text.lower().strip()
 
-    # Case 0: Greeting / Conversational query
+    # Case 0: Bare number / ambiguous amount
+    clean_num = re.sub(r'[\s,₹Rs\.]', '', text_lower)
+    if clean_num.isdigit() and len(clean_num) >= 3:
+        amt = float(clean_num)
+        plan = SarvamPlan(
+            intent="AMBIGUOUS_AMOUNT",
+            confidence=0.90,
+            summary_en=f"Merchant sent a bare amount ₹{amt:,.0f} without context.",
+            summary_hi=f"Merchant ne sirf amount ₹{amt:,.0f} bheja hai, context clear nahi hai.",
+            suggested_reply_hi=f"Namaste {merchant_name}! Aapne ₹{amt:,.0f} ka zikr kiya hai. Kripya batayein — kya yeh settlement ka issue hai ya customer refund ka?",
+            amount_mentioned=amt,
+            proposed_reads=[],
+            proposed_writes=[],
+            needs_human=False
+        )
+        return plan, "FIXTURE", 35
+
+    # Case 1: Greeting / Conversational query
     greeting_words = ["hello", "hi", "hey", "namaste", "kaise", "haal", "shukriya", "thanks", "who are you", "kya kar", "help", "madad"]
-    if any(g in text_lower for g in greeting_words) and not any(k in text_lower for k in ["settlement", "refund", "freeze", "aml"]):
+    if any(g in text_lower for g in greeting_words) and not any(k in text_lower for k in ["settlement", "refund", "wapas", "freeze", "aml"]):
         plan = SarvamPlan(
             intent="GREETING",
             confidence=0.98,
             summary_en="Merchant initiated conversation or greeting.",
             summary_hi="Merchant ne namaste/greeting bheja hai.",
-            suggested_reply_hi=f"Namaste {merchant_name}! 🙏 Main Resolve OS hoon — aapka automated merchant operations teammate. Main settlement status check, bank retry, aur customer refund issues turant resolve kar sakta hoon. Aap bataiye, aaj kis settlement ya transaction me madad chahiye?",
+            suggested_reply_hi=f"Namaste {merchant_name}! 🙏 Main Resolve OS hoon. Aapko settlement, refund, ya QR/soundbox me kya madad chahiye?",
             proposed_reads=[],
             proposed_writes=[],
             needs_human=False
         )
         return plan, "FIXTURE", 45
 
-    # Case 1: Refund issue
-    if "refund" in text_lower:
+    # Case 2: Refund issue (keywords refund, wapas, return)
+    if any(w in text_lower for w in ["refund", "wapas", "return"]):
         plan = SarvamPlan(
             intent="REFUND_STATUS",
             confidence=0.92,
             summary_en="Merchant requesting status/action on customer refund.",
             summary_hi="Customer refund ki request hai. Transaction verify karni hai.",
             suggested_reply_hi=f"Namaste {merchant_name}, aapke refund request ki verification shuru kar di hai. Details verify hone par update diya jayega.",
+            missing_fields=["utr"],
             proposed_reads=[PlanRead(tool="get_transactions", args={"merchant_id": merchant_id})],
-            proposed_writes=[
-                PlanAction(
-                    action="request_refund",
-                    args={"merchant_id": merchant_id},
-                    why="Process requested customer refund if eligible."
-                )
-            ],
+            proposed_writes=[],
             needs_human=False
         )
         return plan, "FIXTURE", 95
 
-    # Case 2: Settlement issue
-    if any(w in text_lower for w in ["settlement", "paisa", "rupaye", "rs", "bank", "credit", "aaya", "utr"]) or settlements:
+    # Case 3: Device issue (Soundbox offline / announcement not working)
+    if any(kw in text_lower for kw in ["soundbox", "device", "announcement", "sound", "speaker", "awaaz"]):
+        plan = SarvamPlan(
+            intent="DEVICE_ISSUE",
+            confidence=0.88,
+            summary_en="Merchant reports Soundbox device issue. Requires device ops review.",
+            summary_hi="Soundbox announcement nahi aa rahi. Device ops ko escalate karna hoga.",
+            proposed_reads=[PlanRead(tool="get_device", args={"merchant_id": merchant_id})],
+            proposed_writes=[],
+            needs_human=True,
+            human_reason="Device issues require field ops or hardware replacement — cannot be resolved autonomously."
+        )
+        return plan, "FIXTURE", 75
+
+    # Case 4: QR issue (damaged standee, QR not working)
+    if any(kw in text_lower for kw in ["qr", "standee", "scan"]):
+        plan = SarvamPlan(
+            intent="QR_DOWN",
+            confidence=0.85,
+            summary_en="Merchant reports QR standee damage or scanning issue. Logistics required.",
+            summary_hi="QR standee damage hua hai. Nayi standee bhejni hogi.",
+            proposed_reads=[PlanRead(tool="get_device", args={"merchant_id": merchant_id})],
+            proposed_writes=[],
+            needs_human=True,
+            human_reason="QR standee replacement requires physical logistics — cannot be resolved autonomously."
+        )
+        return plan, "FIXTURE", 78
+
+    # Case 5: Settlement issue
+    if any(w in text_lower for w in ["settlement", "paisa", "rupaye", "credit", "aaya"]) or (settlements and any(w in text_lower for w in ["bank", "utr", "pending", "kal", "aaj"])):
         # Check if settlement is failed or account frozen
         if settlements and (settlements[0].get("status") == "FAILED" or "FROZEN" in (settlements[0].get("reason") or "")):
             batch = settlements[0]
@@ -171,35 +217,7 @@ Current Transactions in DB: {json.dumps(transactions)}
         )
         return plan, "FIXTURE", 90
 
-    # Case 3: Device issue (Soundbox offline / announcement not working)
-    if any(kw in text_lower for kw in ["soundbox", "device", "announcement", "sound"]):
-        plan = SarvamPlan(
-            intent="DEVICE_ISSUE",
-            confidence=0.88,
-            summary_en="Merchant reports Soundbox device issue. Requires device ops review.",
-            summary_hi="Soundbox announcement nahi aa rahi. Device ops ko escalate karna hoga.",
-            proposed_reads=[PlanRead(tool="get_device", args={"merchant_id": merchant_id})],
-            proposed_writes=[],
-            needs_human=True,
-            human_reason="Device issues require field ops or hardware replacement — cannot be resolved autonomously."
-        )
-        return plan, "FIXTURE", 75
-
-    # Case 4: QR issue (damaged standee, QR not working)
-    if any(kw in text_lower for kw in ["qr", "standee", "scan"]):
-        plan = SarvamPlan(
-            intent="QR_DOWN",
-            confidence=0.85,
-            summary_en="Merchant reports QR standee damage or scanning issue. Logistics required.",
-            summary_hi="QR standee damage hua hai. Nayi standee bhejni hogi.",
-            proposed_reads=[PlanRead(tool="get_device", args={"merchant_id": merchant_id})],
-            proposed_writes=[],
-            needs_human=True,
-            human_reason="QR standee replacement requires physical logistics — cannot be resolved autonomously."
-        )
-        return plan, "FIXTURE", 78
-
-    # Case 5: Unknown intent — safe escalation
+    # Case 6: Unknown intent — safe escalation
     plan = SarvamPlan(
         intent="UNKNOWN",
         confidence=0.50,

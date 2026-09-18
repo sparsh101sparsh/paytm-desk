@@ -27,12 +27,23 @@ WHATSAPP_TEMPLATES = {
     ),
     "greeting_ack": (
         "Namaste {merchant_name}! 🙏 Main Resolve OS hoon — aapka automated merchant operations teammate. "
-        "Main settlement status check, bank retry, aur customer refund issues turant resolve kar sakta hoon. "
-        "Aap apni query ya settlement amount batayein."
+        "Aapko settlement, refund, ya QR/soundbox me kya madad chahiye?"
     ),
     "settlement_already_settled": (
         "Namaste {merchant_name}, Resolve OS here. Aapka settlement batch {batch_id} (₹{amount}) "
         "bank se pehle hi SUCCESSFULLY transfer ho chuka hai (UTR: {utr}). Kripya bank statement check karein. Ticket {ticket_id}."
+    ),
+    "ask_clarification": (
+        "Namaste {merchant_name}, Resolve OS here. Aapne ₹{amount} ka zikr kiya hai. "
+        "Kripya batayein — kya yeh settlement ka issue hai ya customer refund ka? Ticket {ticket_id}."
+    ),
+    "escalate_device": (
+        "Namaste {merchant_name}, Resolve OS here. Soundbox / device issue ko Field Ops team ko "
+        "transfer kar diya gaya hai. Ticket {ticket_id}."
+    ),
+    "escalate_qr": (
+        "Namaste {merchant_name}, Resolve OS here. QR standee issue ko Logistics team ko "
+        "escalate kiya gaya hai. Ticket {ticket_id}."
     ),
 }
 
