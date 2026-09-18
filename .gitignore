@@ -17,3 +17,4 @@ __pycache__/
 # Secrets — never commit API keys
 .env
 .env*
+tsconfig.tsbuildinfo

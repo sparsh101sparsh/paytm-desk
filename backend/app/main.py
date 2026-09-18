@@ -58,6 +58,68 @@ def reset_demo():
     seed_database()
     return {"status": "ok", "message": "Demo reset to initial seed."}
 
+@app.post("/api/demo/set-amount")
+def demo_set_amount(body: Dict[str, Any]):
+    merchant_id = body.get("merchant_id", "m_2041")
+    amount = float(body.get("amount", 200000.0))
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE settlements SET amount = ? WHERE merchant_id = ?", (amount, merchant_id))
+    cur.execute("UPDATE tickets SET amount = ? WHERE merchant_id = ?", (amount, merchant_id))
+    conn.commit()
+    conn.close()
+    return {"status": "ok", "merchant_id": merchant_id, "new_amount": amount}
+
+@app.post("/api/demo/toggle-freeze")
+def demo_toggle_freeze(body: Dict[str, Any]):
+    merchant_id = body.get("merchant_id", "m_2099")
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT risk_flag FROM merchants WHERE id = ?", (merchant_id,))
+    row = cur.fetchone()
+    current_flag = row["risk_flag"] if row else None
+    if current_flag:
+        new_flag = None
+        new_stl_status = "INITIATED"
+        new_stl_reason = "BANK_FILE_PENDING"
+    else:
+        new_flag = "AML_SUSPECT"
+        new_stl_status = "FAILED"
+        new_stl_reason = "ACCOUNT_FROZEN_AML"
+    cur.execute("UPDATE merchants SET risk_flag = ? WHERE id = ?", (new_flag, merchant_id))
+    cur.execute("UPDATE settlements SET status = ?, reason = ? WHERE merchant_id = ?", (new_stl_status, new_stl_reason, merchant_id))
+    conn.commit()
+    conn.close()
+    return {"status": "ok", "merchant_id": merchant_id, "risk_flag": new_flag, "settlement_status": new_stl_status}
+
+@app.post("/api/demo/reset-merchant")
+def demo_reset_merchant(body: Dict[str, Any]):
+    merchant_id = body.get("merchant_id", "m_2041")
+    conn = get_db()
+    cur = conn.cursor()
+    if merchant_id == "m_2041":
+        cur.execute("UPDATE merchants SET risk_flag = NULL WHERE id = 'm_2041'")
+        cur.execute("UPDATE tickets SET status = 'OPEN', amount = 14280.0 WHERE id = 'T-1042'")
+        cur.execute("UPDATE settlements SET amount = 14280.0, status = 'INITIATED', reason = 'BANK_FILE_PENDING', utr = NULL, retry_count = 0 WHERE merchant_id = 'm_2041'")
+        cur.execute("DELETE FROM audit_events WHERE ticket_id = 'T-1042'")
+        cur.execute("DELETE FROM whatsapp_messages WHERE ticket_id = 'T-1042'")
+    elif merchant_id == "m_2048":
+        cur.execute("UPDATE merchants SET risk_flag = NULL WHERE id = 'm_2048'")
+        cur.execute("UPDATE tickets SET status = 'OPEN', amount = 850.0 WHERE id = 'T-1048'")
+        cur.execute("DELETE FROM refunds WHERE ticket_id = 'T-1048'")
+        cur.execute("DELETE FROM audit_events WHERE ticket_id = 'T-1048'")
+        cur.execute("DELETE FROM whatsapp_messages WHERE ticket_id = 'T-1048'")
+    elif merchant_id == "m_2099":
+        cur.execute("UPDATE merchants SET risk_flag = 'AML_SUSPECT' WHERE id = 'm_2099'")
+        cur.execute("UPDATE tickets SET status = 'OPEN', amount = 184000.0 WHERE id = 'T-1055'")
+        cur.execute("UPDATE settlements SET amount = 184000.0, status = 'FAILED', reason = 'ACCOUNT_FROZEN_AML', utr = NULL, retry_count = 0 WHERE merchant_id = 'm_2099'")
+        cur.execute("DELETE FROM human_briefs WHERE ticket_id = 'T-1055'")
+        cur.execute("DELETE FROM audit_events WHERE ticket_id = 'T-1055'")
+        cur.execute("DELETE FROM whatsapp_messages WHERE ticket_id = 'T-1055'")
+    conn.commit()
+    conn.close()
+    return {"status": "ok", "merchant_id": merchant_id}
+
 
 @app.get("/api/tickets")
 def get_tickets():
