@@ -19,6 +19,10 @@ class SarvamPlan(BaseModel):
     confidence: float = 0.9
     summary_en: str
     summary_hi: str
+    # Grok-suggested enrichments: Sarvam extracts these from Hinglish text
+    # Policy never trusts these for money decisions — ledger state decides
+    amount_mentioned: Optional[float] = None   # Rupee amount the merchant mentioned
+    missing_fields: List[str] = Field(default_factory=list)  # e.g. ["utr"]
     proposed_reads: List[PlanRead] = Field(default_factory=list)
     proposed_writes: List[PlanAction] = Field(default_factory=list)
     needs_human: bool = False

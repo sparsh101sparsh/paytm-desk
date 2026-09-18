@@ -330,9 +330,35 @@ def decide_policy(body: Dict[str, Any]):
 def execute_tool(tool_name: str, body: Dict[str, Any]):
     """
     Direct endpoint for n8n to execute verified tools with policy tokens.
+    SECURITY: Money-moving tools (retry_settlement_file, request_refund) require a
+    valid policy_token that was genuinely issued by evaluate_policy() in this session.
     """
     ticket_id = body.get("ticket_id", "")
     policy_token = body.get("policy_token", "")
+
+    # SECURITY GATE: For money-moving tools, verify the policy_token was actually
+    # issued by our policy engine (must exist in audit_events for this ticket).
+    # This prevents external callers from bypassing run_desk() and directly moving funds.
+    MONEY_TOOLS = {"retry_settlement_file", "request_refund"}
+    if tool_name in MONEY_TOOLS:
+        if not policy_token or not ticket_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Money-moving tools require a valid policy_token issued by evaluate_policy(). Use POST /api/tickets/{id}/run instead."
+            )
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id FROM audit_events WHERE ticket_id = ? AND policy_token = ? AND type = 'DECIDED'",
+            (ticket_id, policy_token)
+        )
+        valid = cur.fetchone()
+        conn.close()
+        if not valid:
+            raise HTTPException(
+                status_code=403,
+                detail="policy_token not recognized. Token must be issued by evaluate_policy() for this ticket."
+            )
 
     if tool_name == "retry_settlement_file":
         batch_id = body.get("batch_id") or body.get("args", {}).get("batch_id")

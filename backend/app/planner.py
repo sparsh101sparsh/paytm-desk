@@ -21,6 +21,8 @@ Think briefly. Analyze the merchant ticket and context. Return ONLY a valid JSON
   "confidence": 0.95,
   "summary_en": "One sentence summary in English",
   "summary_hi": "One sentence summary in Hinglish",
+  "amount_mentioned": 14280,
+  "missing_fields": ["utr"],
   "proposed_reads": [{"tool": "get_settlements", "args": {"merchant_id": "..."}}],
   "proposed_writes": [{"action": "retry_settlement_file | request_refund", "args": {"batch_id": "..."}, "why": "..."}],
   "needs_human": false,
@@ -28,9 +30,12 @@ Think briefly. Analyze the merchant ticket and context. Return ONLY a valid JSON
 }
 Rules:
 - Never invent UTR numbers.
-- Propose actions only; Policy executes.
+- Propose actions only; Policy executes and decides based on ledger state — not on your output.
+- amount_mentioned: extract any rupee amount the merchant mentioned, or null if none.
+- missing_fields: list fields that would be needed to proceed (e.g. ["utr"] if refund but no UTR given).
 - Output pure JSON only.
 """
+
 
 
 def generate_plan(db_state: Dict[str, Any]) -> Tuple[SarvamPlan, str, int]:
