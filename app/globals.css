@@ -45,6 +45,79 @@ body {
   background-size: 20px 20px;
 }
 
+/* Premium Ambient Ops Canvas Background */
+.ros-ambient-canvas {
+  background-color: #F8FAFD;
+  background-image: 
+    radial-gradient(at 50% 0%, rgba(0, 186, 242, 0.06) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(0, 41, 112, 0.04) 0px, transparent 40%),
+    radial-gradient(circle, rgba(0, 41, 112, 0.065) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 20px 20px;
+}
+
+/* Tactile Surface Cards & Glass Panels */
+.ros-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 1px 3px 0 rgba(0, 41, 112, 0.04), 0 1px 2px -1px rgba(0, 41, 112, 0.03);
+}
+
+.ros-card-elevated {
+  background: #FFFFFF;
+  border: 1px solid rgba(203, 213, 225, 0.6);
+  box-shadow: 0 4px 16px -4px rgba(0, 41, 112, 0.08), 0 2px 4px -2px rgba(0, 41, 112, 0.03);
+}
+
+/* Resizable Column Splitter with Col-Resize (<->) Cursor */
+.ros-splitter {
+  position: relative;
+  width: 6px;
+  cursor: col-resize;
+  background-color: transparent;
+  flex-shrink: 0;
+  user-select: none;
+  touch-action: none;
+  z-index: 25;
+  margin: 0 -2.5px;
+}
+
+.ros-splitter::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2.5px;
+  width: 1px;
+  background-color: #E2E8F0;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ros-splitter:hover::after,
+.ros-splitter-active::after {
+  background-color: #00BAF2;
+  width: 2px;
+  left: 2px;
+  box-shadow: 0 0 8px rgba(0, 186, 242, 0.6);
+}
+
+/* Grab handle indicator on splitter */
+.ros-splitter:hover .ros-grab-pill,
+.ros-splitter-active .ros-grab-pill {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
+
+.ros-grab-pill {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.85);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.15s ease;
+  z-index: 30;
+}
+
 /* Accessibility: prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {

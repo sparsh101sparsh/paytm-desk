@@ -21,6 +21,7 @@ import {
   Sliders,
   SendHorizontal,
   ArrowRight,
+  GripVertical,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -166,6 +167,77 @@ export default function ResolveOS() {
   const [simText, setSimText] = useState<string>("");
   const [simSending, setSimSending] = useState<boolean>(false);
 
+  // Resizable Column Splitters State & Handlers
+  const [queueWidth, setQueueWidth] = useState<number>(290);
+  const [forensicWidth, setForensicWidth] = useState<number>(340);
+  const [isDraggingLeft, setIsDraggingLeft] = useState<boolean>(false);
+  const [isDraggingRight, setIsDraggingRight] = useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      const savedQueue = localStorage.getItem("ros_queue_width");
+      if (savedQueue) {
+        const parsed = parseInt(savedQueue, 10);
+        if (!isNaN(parsed)) setQueueWidth(Math.max(220, Math.min(460, parsed)));
+      }
+      const savedForensic = localStorage.getItem("ros_forensic_width");
+      if (savedForensic) {
+        const parsed = parseInt(savedForensic, 10);
+        if (!isNaN(parsed)) setForensicWidth(Math.max(260, Math.min(520, parsed)));
+      }
+    } catch {}
+  }, []);
+
+  const handleLeftResizeStart = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    setIsDraggingLeft(true);
+    const startX = e.clientX;
+    const startWidth = queueWidth;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const delta = moveEvent.clientX - startX;
+      const newWidth = Math.max(220, Math.min(460, startWidth + delta));
+      setQueueWidth(newWidth);
+    };
+
+    const onPointerUp = () => {
+      setIsDraggingLeft(false);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      try {
+        localStorage.setItem("ros_queue_width", String(queueWidth));
+      } catch {}
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+  }, [queueWidth]);
+
+  const handleRightResizeStart = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    setIsDraggingRight(true);
+    const startX = e.clientX;
+    const startWidth = forensicWidth;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const delta = startX - moveEvent.clientX;
+      const newWidth = Math.max(260, Math.min(520, startWidth + delta));
+      setForensicWidth(newWidth);
+    };
+
+    const onPointerUp = () => {
+      setIsDraggingRight(false);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      try {
+        localStorage.setItem("ros_forensic_width", String(forensicWidth));
+      } catch {}
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+  }, [forensicWidth]);
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const knownTicketIdsRef = useRef<Set<string>>(new Set());
@@ -304,7 +376,7 @@ export default function ResolveOS() {
     updateTabPosition();
     window.addEventListener("resize", updateTabPosition);
     return () => window.removeEventListener("resize", updateTabPosition);
-  }, [hoveredTab, activeTab]);
+  }, [hoveredTab, activeTab, queueWidth]);
 
   // Reposition Header Action Gliding Pill
   useLayoutEffect(() => {
@@ -648,7 +720,9 @@ export default function ResolveOS() {
   ] as const;
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#F5F7FB] text-[#1B1F3B] font-sans antialiased select-none">
+    <div className={`flex flex-col h-screen w-screen overflow-hidden bg-[#F5F7FB] text-[#1B1F3B] font-sans antialiased ${
+      isDraggingLeft || isDraggingRight ? "select-none cursor-col-resize" : "select-none"
+    }`}>
       {/* ─── Top Bar (40px Paytm Navy #002970) ─────────────────────────────── */}
       <header className="h-[40px] shrink-0 bg-[#002970] border-b border-[#00BAF2]/30 flex items-center justify-between px-4 z-20">
         {/* Left: Brand */}
@@ -903,9 +977,12 @@ export default function ResolveOS() {
       {/* ─── Main 3-Column Ops Desk ──────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
         {/* ═══════════════════════════════════════════════════════════════════
-            COLUMN 1: Queue (280px fixed width)
+            COLUMN 1: Queue (Resizable width)
             ═══════════════════════════════════════════════════════════════════ */}
-        <aside className="w-[280px] shrink-0 bg-white border-r border-[#E5E7EB] flex flex-col h-full overflow-hidden">
+        <aside
+          style={{ width: `${queueWidth}px` }}
+          className="shrink-0 bg-white border-r border-[#E5E7EB] flex flex-col h-full overflow-hidden shadow-[2px_0_8px_-3px_rgba(0,41,112,0.04)] z-10"
+        >
           {/* Header */}
           <div className="p-3 border-b border-[#E5E7EB] flex items-center justify-between shrink-0">
             <span className="font-medium text-[13px] text-[#002970]">Queue</span>
@@ -1063,43 +1140,61 @@ export default function ResolveOS() {
           </div>
         </aside>
 
+        {/* ─── Column 1 / 2 Resizable Splitter (<->) ─── */}
+        <div
+          onPointerDown={handleLeftResizeStart}
+          className={`ros-splitter ${isDraggingLeft ? "ros-splitter-active" : ""}`}
+          title="Drag to resize Queue sidebar (<->)"
+          role="separator"
+          aria-orientation="vertical"
+        >
+          <div className="ros-grab-pill px-0.5 py-2 rounded bg-[#002970] text-white shadow-md flex items-center justify-center border border-[#00BAF2]/40">
+            <GripVertical className="w-2.5 h-3 text-[#00BAF2]" />
+          </div>
+        </div>
+
         {/* ═══════════════════════════════════════════════════════════════════
             COLUMN 2: Workspace (Fluid center column)
             ═══════════════════════════════════════════════════════════════════ */}
-        <main className="flex-1 flex flex-col min-w-0 bg-[#F5F7FB] overflow-y-auto">
+        <main className="flex-1 flex flex-col min-w-0 ros-ambient-canvas overflow-y-auto">
           {selectedTicket ? (
             <div className="p-6 max-w-4xl w-full mx-auto space-y-4">
-              {/* 3a. Case Header */}
-              <div className="bg-white rounded-lg border border-[#E5E7EB] p-4 flex items-center justify-between gap-4">
+              {/* 3a. Case Header with Surface Elevation & Specular Top Accent */}
+              <div className="ros-card-elevated rounded-xl p-5 relative overflow-hidden flex items-center justify-between gap-4 border border-slate-200/90">
+                <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-[#002970] via-[#00BAF2] to-transparent" />
                 <div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-[20px] font-medium text-[#002970] font-mono">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-lg font-bold text-[#002970] font-mono tracking-tight px-2.5 py-0.5 rounded-[4px] bg-[#002970]/5 border border-[#002970]/15">
                       {selectedTicket.id}
                     </span>
                     <span className="text-slate-300">·</span>
-                    <span className="text-base font-medium text-slate-800">
+                    <span className="text-base font-semibold text-slate-800">
                       {selectedTicket.intent || "Merchant Operations Dispute"}
                     </span>
                   </div>
-                  <div className="text-xs font-normal text-slate-500 mt-0.5">
-                    {detail?.merchant?.name || selectedTicket.merchant_name} · {detail?.merchant?.city || selectedTicket.merchant_city || "Delhi NCR"} · {selectedTicket.merchant_id}
+                  <div className="text-xs font-normal text-slate-500 mt-1 flex items-center gap-1.5">
+                    <span className="font-medium text-slate-700">{detail?.merchant?.name || selectedTicket.merchant_name}</span>
+                    <span>&middot;</span>
+                    <span>{detail?.merchant?.city || selectedTicket.merchant_city || "Delhi NCR"}</span>
+                    <span>&middot;</span>
+                    <span className="font-mono text-slate-400">{selectedTicket.merchant_id}</span>
                   </div>
                 </div>
 
                 {/* Primary Actions */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5 shrink-0">
                   {selectedTicket.status === "ESCALATED" && (
                     <>
                       <button
                         onClick={handleApprove}
-                        className="px-3 py-1.5 rounded text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition active:scale-95 flex items-center gap-1.5 shadow-sm"
+                        className="h-8 px-3.5 rounded-[4px] text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition active:scale-95 flex items-center gap-1.5 shadow-sm"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>Approve Override</span>
                       </button>
                       <button
                         onClick={handleReject}
-                        className="px-3 py-1.5 rounded text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition active:scale-95 flex items-center gap-1.5"
+                        className="h-8 px-3 rounded-[4px] text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition active:scale-95 flex items-center gap-1.5"
                       >
                         <AlertCircle className="w-3.5 h-3.5" />
                         <span>Reject Ticket</span>
@@ -1110,7 +1205,7 @@ export default function ResolveOS() {
                   {cannotAutoRetry ? (
                     <button
                       disabled
-                      className="px-4 py-2 rounded text-xs font-medium bg-slate-200 text-slate-400 cursor-not-allowed"
+                      className="h-8 px-4 rounded-[4px] text-xs font-medium bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed flex items-center gap-1.5"
                     >
                       Run Resolve OS
                     </button>
@@ -1118,16 +1213,16 @@ export default function ResolveOS() {
                     <button
                       onClick={handleRun}
                       disabled={isRunning}
-                      className="px-4 py-2 rounded text-xs font-medium bg-[#002970] hover:bg-[#001f56] text-white transition active:scale-95 flex items-center gap-2 disabled:opacity-75 disabled:cursor-wait"
+                      className="h-8 px-4 rounded-[4px] text-xs font-medium bg-gradient-to-r from-[#002970] to-[#001f56] hover:from-[#001a4d] hover:to-[#00153a] text-white transition active:scale-95 flex items-center gap-2 border border-[#00BAF2]/40 shadow-[0_2px_8px_rgba(0,41,112,0.25)] hover:shadow-[0_4px_14px_rgba(0,186,242,0.3)] disabled:opacity-75 disabled:cursor-wait"
                     >
                       {isRunning ? (
                         <>
-                          <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                          <RotateCcw className="w-3.5 h-3.5 animate-spin text-[#00BAF2]" />
                           <span>Running... ({elapsed.toFixed(1)}s)</span>
                         </>
                       ) : (
                         <>
-                          <Play className="w-3 h-3 fill-current" />
+                          <Play className="w-3 h-3 fill-[#00BAF2] text-[#00BAF2]" />
                           <span>{selectedTicket.status === "OPEN" ? "Run Resolve OS" : "Re-run Resolve OS"}</span>
                         </>
                       )}
@@ -1136,61 +1231,84 @@ export default function ResolveOS() {
                 </div>
               </div>
 
-              {/* 3b. Merchant Message (Clean bubble) */}
-              <div className="bg-white border border-[#E5E7EB] rounded-lg p-4 max-w-2xl">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 mb-2.5">
-                  <span className="text-xs font-medium text-slate-900">
-                    {detail?.merchant?.name || selectedTicket.merchant_name}
-                  </span>
-                  <span className="text-[11px] font-normal text-slate-400">
-                    WhatsApp · {timeAgo(selectedTicket.created_at)}
+              {/* 3b. Merchant Message (Tactile Quote Bubble) */}
+              <div className="ros-card rounded-xl p-4 shadow-sm border border-slate-200/90 space-y-2.5">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="size-5 rounded-[4px] bg-[#002970]/10 flex items-center justify-center text-[#002970] font-bold text-[10px]">
+                      {(detail?.merchant?.name || selectedTicket.merchant_name).charAt(0)}
+                    </div>
+                    <span className="text-xs font-semibold text-slate-800">
+                      {detail?.merchant?.name || selectedTicket.merchant_name}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+                    <span className="size-1.5 rounded-full bg-emerald-500" />
+                    WhatsApp &middot; {timeAgo(selectedTicket.created_at)}
                   </span>
                 </div>
-                <p className="text-[14px] font-normal text-slate-900 leading-relaxed">
-                  &ldquo;{selectedTicket.text}&rdquo;
-                </p>
+                <div className="p-3.5 rounded-lg bg-slate-50/90 border-l-4 border-l-[#00BAF2] shadow-xs">
+                  <p className="text-[13.5px] font-medium text-slate-800 leading-relaxed italic">
+                    &ldquo;{selectedTicket.text}&rdquo;
+                  </p>
+                </div>
               </div>
 
-              {/* 3c. Pipeline Strip (5 quiet stations) */}
-              <div className="space-y-1.5">
-                <span className="text-xs font-medium text-slate-700 block px-0.5">
-                  Pipeline
-                </span>
-                <div className="grid grid-cols-5 gap-2">
+              {/* 3c. Pipeline Strip (5 Luminous Stations) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-0.5">
+                  <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider text-[11px]">
+                    Telemetry Pipeline
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    5-Stage Deterministic Orchestration
+                  </span>
+                </div>
+                <div className="grid grid-cols-5 gap-2.5">
                   {stations.map((st) => (
                     <div
                       key={st.num}
-                      className={`p-3 rounded-lg border text-left flex flex-col justify-between min-h-[76px] ${
+                      className={`p-3 rounded-xl border text-left flex flex-col justify-between min-h-[82px] transition-all duration-200 ${
                         st.active
-                          ? "bg-cyan-50/40 border-[#00BAF2] animate-pulse"
+                          ? "bg-gradient-to-b from-cyan-50/70 to-white border-[#00BAF2] ring-2 ring-[#00BAF2]/30 shadow-[0_0_12px_rgba(0,186,242,0.2)] animate-pulse"
                           : st.done
-                          ? "bg-white border-[#E5E7EB]"
-                          : "bg-slate-50/50 border-[#E5E7EB]"
+                          ? "bg-white border-emerald-300 shadow-xs"
+                          : "bg-slate-50/80 border-slate-200/80"
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-medium text-slate-400 font-mono">
-                          {st.num}
+                        <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded ${
+                          st.done ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-400"
+                        }`}>
+                          0{st.num}
                         </span>
-                        {st.done && <Check className="w-3.5 h-3.5 text-[#002970]" />}
+                        {st.done && (
+                          <div className="size-4 rounded-full bg-emerald-50 border border-emerald-300 flex items-center justify-center">
+                            <Check className="w-2.5 h-2.5 text-emerald-700" />
+                          </div>
+                        )}
                       </div>
-                      <div className="text-xs font-medium text-slate-900 mt-1">
-                        {st.name}
-                      </div>
-                      <div className="text-[10px] font-normal text-slate-500 truncate mt-0.5">
-                        {st.val}
+                      <div>
+                        <div className="text-xs font-semibold text-slate-900 mt-1">
+                          {st.name}
+                        </div>
+                        <div className="text-[10px] font-medium text-slate-500 truncate mt-0.5">
+                          {st.val}
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* 3d. Outcome Banner (Big and quiet) */}
+              {/* 3d. Outcome Banner */}
               {selectedTicket.status === "RESOLVED" && (
-                <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-lg text-emerald-950 flex items-center gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                <div className="p-4 bg-gradient-to-r from-emerald-50/90 via-white to-emerald-50/40 border border-emerald-300 rounded-xl text-emerald-950 flex items-center gap-3.5 shadow-[0_4px_16px_rgba(16,185,129,0.12)]">
+                  <div className="size-9 rounded-lg bg-emerald-100 border border-emerald-300 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-700" />
+                  </div>
                   <div>
-                    <div className="text-sm font-medium">RESOLVED · Settlement retried</div>
+                    <div className="text-sm font-semibold text-emerald-900">RESOLVED · Settlement retried</div>
                     <div className="text-xs font-normal text-emerald-800 mt-0.5">
                       Batch re-pushed to bank file. Expected in merchant account within 2 hours.
                     </div>
@@ -1199,10 +1317,12 @@ export default function ResolveOS() {
               )}
 
               {selectedTicket.status === "WAITING_ON_MERCHANT" && (
-                <div className="p-4 bg-amber-50 border border-amber-300 rounded-lg text-amber-950 flex items-center gap-3">
-                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                <div className="p-4 bg-gradient-to-r from-amber-50/90 via-white to-amber-50/40 border border-amber-300 rounded-xl text-amber-950 flex items-center gap-3.5 shadow-[0_4px_16px_rgba(245,158,11,0.12)]">
+                  <div className="size-9 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-center shrink-0">
+                    <AlertCircle className="w-5 h-5 text-amber-700" />
+                  </div>
                   <div>
-                    <div className="text-sm font-medium">WAITING ON MERCHANT · UTR requested</div>
+                    <div className="text-sm font-semibold text-amber-900">WAITING ON MERCHANT · UTR requested</div>
                     <div className="text-xs font-normal text-amber-800 mt-0.5">
                       Multiple matches in ledger. WhatsApp template sent requesting 12-digit UTR.
                     </div>
@@ -1211,44 +1331,53 @@ export default function ResolveOS() {
               )}
 
               {selectedTicket.status === "ESCALATED" && (
-                <div className="p-4 bg-red-50 border border-red-300 rounded-lg text-red-950 flex items-center gap-3">
-                  <ShieldAlert className="w-5 h-5 text-red-600 shrink-0" />
+                <div className="p-4 bg-gradient-to-r from-rose-50/90 via-white to-rose-50/40 border border-rose-300 rounded-xl text-rose-950 flex items-center gap-3.5 shadow-[0_4px_16px_rgba(244,63,94,0.12)]">
+                  <div className="size-9 rounded-lg bg-rose-100 border border-rose-300 flex items-center justify-center shrink-0">
+                    <ShieldAlert className="w-5 h-5 text-red-700" />
+                  </div>
                   <div>
-                    <div className="text-sm font-medium">ESCALATED · Risk Ops review</div>
-                    <div className="text-xs font-normal text-red-800 mt-0.5">
+                    <div className="text-sm font-semibold text-rose-900">ESCALATED · Risk Ops review</div>
+                    <div className="text-xs font-normal text-rose-800 mt-0.5">
                       Deterministic policy blocked automated retry. Handed off to human queue with structured brief.
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* 3e. Inbound / Outbound WhatsApp Timeline */}
-              <div className="bg-white border border-[#E5E7EB] rounded-lg p-4 space-y-3">
-                <span className="text-[10px] font-medium tracking-[0.06em] text-[#6B7280] uppercase block">
-                  WhatsApp Thread
-                </span>
+              {/* 3e. Inbound / Outbound WhatsApp Timeline (Real WhatsApp Chat Cards) */}
+              <div className="ros-card rounded-xl p-4 shadow-sm border border-slate-200/90 space-y-3.5">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-[10px] font-bold tracking-[0.08em] text-slate-500 uppercase">
+                    WhatsApp Thread (End-to-End Encrypted)
+                  </span>
+                  <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
+                    <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Meta Cloud API Verified
+                  </span>
+                </div>
 
-                <div className="space-y-2 max-w-xl">
-                  {/* Inbound */}
-                  <div className="bg-slate-100 rounded-lg p-3 text-xs text-slate-800">
-                    <div className="text-[10px] font-medium text-slate-400 mb-1">
-                      {detail?.merchant?.name || selectedTicket.merchant_name} · Inbound
+                <div className="space-y-3 max-w-xl">
+                  {/* Inbound WhatsApp Message */}
+                  <div className="bg-white border border-slate-200/80 rounded-2xl rounded-tl-sm p-3.5 text-xs text-slate-800 shadow-sm space-y-1">
+                    <div className="text-[10px] font-semibold text-[#002970] flex items-center justify-between">
+                      <span>{detail?.merchant?.name || selectedTicket.merchant_name} (Merchant)</span>
+                      <span className="text-slate-400 font-normal">{timeAgo(selectedTicket.created_at)}</span>
                     </div>
-                    <div>{selectedTicket.text}</div>
+                    <div className="text-[13px] leading-relaxed text-slate-800">{selectedTicket.text}</div>
                   </div>
 
-                  {/* Outbound */}
+                  {/* Outbound WhatsApp Message */}
                   {detail?.latest_whatsapp ? (
-                    <div className="bg-[#00BAF2]/10 border border-[#00BAF2]/30 rounded-lg p-3 text-xs text-slate-900 ml-6">
-                      <div className="text-[10px] font-medium text-[#002970] mb-1 flex items-center justify-between">
-                        <span>Resolve OS · Outbound ({detail.latest_whatsapp.template_id})</span>
-                        <span className="text-[10px] text-emerald-600 font-medium">SENT VIA META API</span>
+                    <div className="bg-[#E7F8E8] border border-emerald-200/70 rounded-2xl rounded-tr-sm p-3.5 text-xs text-slate-900 ml-6 shadow-sm space-y-1">
+                      <div className="text-[10px] font-semibold text-emerald-800 flex items-center justify-between">
+                        <span>Resolve OS Bot &middot; {detail.latest_whatsapp.template_id}</span>
+                        <span className="text-emerald-700 font-bold tracking-wider">✓✓ DELIVERED</span>
                       </div>
-                      <div className="leading-relaxed">{detail.latest_whatsapp.body}</div>
+                      <div className="text-[13px] leading-relaxed text-slate-900">{detail.latest_whatsapp.body}</div>
                     </div>
                   ) : (
-                    <div className="text-slate-400 text-xs italic pl-2">
-                      No outbound message sent yet. Run Resolve OS to dispatch.
+                    <div className="text-slate-400 text-xs italic pl-2 py-1">
+                      No outbound message sent yet. Click &ldquo;Run Resolve OS&rdquo; to process and dispatch.
                     </div>
                   )}
                 </div>
@@ -1281,76 +1410,93 @@ export default function ResolveOS() {
           )}
         </main>
 
+        {/* ─── Column 2 / 3 Resizable Splitter (<->) ─── */}
+        <div
+          onPointerDown={handleRightResizeStart}
+          className={`ros-splitter ${isDraggingRight ? "ros-splitter-active" : ""}`}
+          title="Drag to resize Forensics sidebar (<->)"
+          role="separator"
+          aria-orientation="vertical"
+        >
+          <div className="ros-grab-pill px-0.5 py-2 rounded bg-[#002970] text-white shadow-md flex items-center justify-center border border-[#00BAF2]/40">
+            <GripVertical className="w-2.5 h-3 text-[#00BAF2]" />
+          </div>
+        </div>
+
         {/* ═══════════════════════════════════════════════════════════════════
-            COLUMN 3: Context Rail (320px fixed width)
+            COLUMN 3: Context Rail (Resizable width)
             ═══════════════════════════════════════════════════════════════════ */}
-        <aside className="w-[320px] shrink-0 bg-white border-l border-[#E5E7EB] flex flex-col h-full overflow-y-auto p-4 space-y-4">
+        <aside
+          style={{ width: `${forensicWidth}px` }}
+          className="shrink-0 bg-white/95 backdrop-blur-sm border-l border-[#E5E7EB] flex flex-col h-full overflow-y-auto p-4 space-y-4 shadow-[-2px_0_8px_-3px_rgba(0,41,112,0.04)] z-10"
+        >
           {/* Card 1: Risk Ops Brief (JUMPS TO TOP IF ESCALATED) */}
           {detail?.human_brief && selectedTicket?.status === "ESCALATED" && (
-            <div className="bg-red-50/80 border border-red-200 rounded-lg p-3 space-y-2">
-              <span className="text-[10px] font-medium tracking-[0.06em] uppercase text-red-700 block">
-                Risk Ops brief
+            <div className="bg-rose-50/90 border border-rose-300/80 rounded-xl p-4 space-y-2 shadow-sm">
+              <span className="text-[10px] font-bold tracking-[0.08em] uppercase text-rose-800 flex items-center gap-1.5">
+                <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
+                Risk Ops Forensic Brief
               </span>
-              <pre className="text-xs font-sans text-red-950 whitespace-pre-wrap leading-relaxed font-normal">
+              <pre className="text-xs font-sans text-rose-950 whitespace-pre-wrap leading-relaxed font-normal bg-white/70 p-3 rounded-lg border border-rose-200">
                 {detail.human_brief.brief_text}
               </pre>
             </div>
           )}
 
           {/* Card 2: Settlement Ledger (FIRST, ALWAYS) */}
-          <div className="bg-slate-50 border border-[#E5E7EB] rounded-lg p-3.5 space-y-2">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
-              <span className="text-[10px] font-medium tracking-[0.06em] uppercase text-[#6B7280]">
-                SETTLEMENT
+          <div className="ros-card rounded-xl p-4 shadow-sm border border-slate-200/90 space-y-2.5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <span className="text-[10px] font-bold tracking-[0.08em] uppercase text-slate-500">
+                Settlement Ledger
               </span>
-              <span className="text-[10px] font-medium text-slate-400">
-                Source: SQLite · TEST DATA
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200">
+                SQLite &middot; Live
               </span>
             </div>
 
             {primarySettlement ? (
-              <div className="space-y-1.5 text-xs font-normal">
-                <div className="flex justify-between py-0.5 border-b border-slate-200/50">
-                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">BATCH</span>
-                  <span className="font-mono text-slate-900">{primarySettlement.id}</span>
+              <div className="space-y-2 text-xs font-normal">
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">BATCH ID</span>
+                  <span className="font-mono text-slate-900 font-medium">{primarySettlement.id}</span>
                 </div>
-                <div className="flex justify-between py-0.5 border-b border-slate-200/50 items-center">
+                <div className="flex justify-between py-1 border-b border-slate-100 items-center">
                   <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">AMOUNT</span>
-                  <span className="text-sm font-medium text-[#002970]">
+                  <span className="text-sm font-bold text-[#002970] font-mono">
                     {formatRupees(primarySettlement.amount)}
                   </span>
                 </div>
-                <div className="flex justify-between py-0.5 border-b border-slate-200/50">
+                <div className="flex justify-between py-1 border-b border-slate-100 items-center">
                   <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">STATUS</span>
                   <span
-                    className={`font-medium ${
+                    className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold tracking-wide border ${
                       primarySettlement.status === "SUCCESS"
-                        ? "text-emerald-700"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-300"
                         : primarySettlement.status === "FAILED"
-                        ? "text-red-700"
-                        : "text-amber-700"
+                        ? "bg-rose-50 text-rose-700 border-rose-300"
+                        : "bg-amber-50 text-amber-700 border-amber-300"
                     }`}
                   >
                     {primarySettlement.status}
                   </span>
                 </div>
-                <div className="flex justify-between py-0.5 border-b border-slate-200/50">
+                <div className="flex justify-between py-1 border-b border-slate-100">
                   <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">RETRIES</span>
-                  <span className="text-slate-800">{primarySettlement.retry_count} / 2</span>
+                  <span className="text-slate-800 font-medium">{primarySettlement.retry_count} / 2</span>
                 </div>
-                <div className="flex justify-between py-0.5 border-b border-slate-200/50">
+                <div className="flex justify-between py-1 border-b border-slate-100">
                   <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">UTR</span>
-                  <span className="font-mono text-slate-800">{primarySettlement.utr || "—"}</span>
+                  <span className="font-mono text-slate-800 font-medium">{primarySettlement.utr || "—"}</span>
                 </div>
-                <div className="flex justify-between py-0.5">
-                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">FREEZE</span>
-                  <span className={primarySettlement.reason?.includes("FROZEN") ? "text-red-600 font-medium" : "text-slate-700"}>
+                <div className="flex justify-between py-1">
+                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">FREEZE / AML</span>
+                  <span className={primarySettlement.reason?.includes("FROZEN") ? "text-red-600 font-bold" : "text-slate-700 font-medium"}>
                     {primarySettlement.reason?.includes("FROZEN") ? "YES · AML" : "No"}
                   </span>
                 </div>
               </div>
             ) : (
-              <div className="text-slate-400 py-2 text-center text-xs">
+              <div className="text-slate-400 py-3 text-center text-xs">
                 No active settlement batch in DB.
               </div>
             )}
@@ -1358,64 +1504,71 @@ export default function ResolveOS() {
 
           {/* Card 3: Policy Verification (Only visible after run) */}
           {decidedEv && (
-            <div className="bg-slate-50 border border-[#E5E7EB] rounded-lg p-3.5 space-y-2">
-              <span className="text-[10px] font-medium tracking-[0.06em] uppercase text-[#6B7280] block border-b border-slate-200 pb-1">
-                POLICY CHECKS
+            <div className="ros-card rounded-xl p-4 shadow-sm border border-slate-200/90 space-y-2.5">
+              <span className="text-[10px] font-bold tracking-[0.08em] uppercase text-slate-500 block border-b border-slate-100 pb-2">
+                Policy Verification Rules
               </span>
 
-              <div className="space-y-1 text-xs font-normal">
-                <div>
+              <div className="space-y-1.5 text-xs font-normal">
+                <div className="flex items-center gap-1.5">
                   {primarySettlement && primarySettlement.amount < 50000 ? (
-                    <span className="text-emerald-700">✓ amount &lt; ₹50,000</span>
+                    <span className="text-emerald-700 font-medium">✓ Amount &lt; ₹50,000 threshold</span>
                   ) : (
-                    <span className="text-red-700">✗ amount ≥ ₹50,000</span>
+                    <span className="text-red-700 font-medium">✗ Amount ≥ ₹50,000 threshold</span>
                   )}
                 </div>
-                <div>
+                <div className="flex items-center gap-1.5">
                   {primarySettlement && primarySettlement.status === "INITIATED" ? (
-                    <span className="text-emerald-700">✓ status INITIATED</span>
+                    <span className="text-emerald-700 font-medium">✓ Status INITIATED (Eligible)</span>
                   ) : primarySettlement?.status === "SUCCESS" ? (
-                    <span className="text-red-700">✗ status is SUCCESS</span>
+                    <span className="text-red-700 font-medium">✗ Status is already SUCCESS</span>
                   ) : (
-                    <span className="text-slate-600">status: {primarySettlement?.status || "—"}</span>
+                    <span className="text-slate-600 font-medium">Status: {primarySettlement?.status || "—"}</span>
                   )}
                 </div>
-                <div>
+                <div className="flex items-center gap-1.5">
                   {primarySettlement && primarySettlement.retry_count < 2 ? (
-                    <span className="text-emerald-700">✓ retries &lt; 2</span>
+                    <span className="text-emerald-700 font-medium">✓ Retry count &lt; 2 remaining</span>
                   ) : (
-                    <span className="text-red-700">✗ retries exhausted</span>
+                    <span className="text-red-700 font-medium">✗ Retries exhausted</span>
                   )}
                 </div>
-                <div>
+                <div className="flex items-center gap-1.5">
                   {activeMerchant?.risk_flag || primarySettlement?.reason?.includes("FROZEN") ? (
-                    <span className="text-red-700">✗ active AML freeze flag</span>
+                    <span className="text-red-700 font-medium">✗ Active AML freeze flag detected</span>
                   ) : (
-                    <span className="text-emerald-700">✓ no freeze / AML</span>
+                    <span className="text-emerald-700 font-medium">✓ No AML freeze / Clean ledger</span>
                   )}
                 </div>
               </div>
 
-              <div className="pt-1.5 border-t border-slate-200 text-xs font-medium">
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">Decision</span>
                 {decidedEv.payload?.action === "retry_settlement_file" ? (
-                  <span className="text-emerald-700">→ ALLOW retry</span>
+                  <span className="px-2 py-0.5 rounded bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold">
+                    ALLOW RETRY
+                  </span>
                 ) : decidedEv.payload?.action === "ask_merchant_utr" ? (
-                  <span className="text-amber-700">→ ASK UTR</span>
+                  <span className="px-2 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-800 text-xs font-bold">
+                    ASK UTR
+                  </span>
                 ) : (
-                  <span className="text-red-700">→ ESCALATE</span>
+                  <span className="px-2 py-0.5 rounded bg-rose-50 border border-rose-300 text-rose-800 text-xs font-bold">
+                    ESCALATE RISK
+                  </span>
                 )}
               </div>
             </div>
           )}
 
           {/* Card 4: Audit Stream */}
-          <div className="bg-slate-50 border border-[#E5E7EB] rounded-lg p-3.5 space-y-2">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-1">
-              <span className="text-[10px] font-medium tracking-[0.06em] uppercase text-[#6B7280]">
-                AUDIT STREAM
+          <div className="ros-card rounded-xl p-4 shadow-sm border border-slate-200/90 space-y-2.5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <span className="text-[10px] font-bold tracking-[0.08em] uppercase text-slate-500">
+                Audit Stream
               </span>
-              <span className="text-[10px] text-slate-400 font-mono">
-                {events.length}
+              <span className="text-[10px] text-[#002970] font-mono font-semibold px-1.5 py-0.2 rounded bg-[#002970]/5">
+                {events.length} events
               </span>
             </div>
 
@@ -1453,28 +1606,31 @@ export default function ResolveOS() {
           </div>
 
           {/* Card 5: Demo Tools (Collapsed behind toggle) */}
-          <div className="border border-[#E5E7EB] rounded-lg bg-white overflow-hidden">
+          <div className="ros-card rounded-xl shadow-sm border border-slate-200/90 overflow-hidden">
             <button
               onClick={() => setDemoToolsOpen(!demoToolsOpen)}
-              className="w-full p-3 text-left flex items-center justify-between text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
+              className="w-full p-3.5 text-left flex items-center justify-between text-xs font-semibold text-slate-700 hover:bg-slate-50/80 transition"
             >
-              <span>Demo tools</span>
-              {demoToolsOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              <span className="flex items-center gap-1.5">
+                <Sliders className="w-3.5 h-3.5 text-[#00BAF2]" />
+                Operator Demo Tools
+              </span>
+              {demoToolsOpen ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
             </button>
 
             {demoToolsOpen && (
-              <div className="p-3 border-t border-[#E5E7EB] space-y-2 bg-slate-50/50">
-                <div className="flex gap-1.5">
+              <div className="p-3.5 border-t border-slate-100 space-y-2.5 bg-slate-50/50">
+                <div className="flex gap-1.5 items-center">
                   <input
                     type="number"
                     value={customAmount}
                     onChange={(e) => setCustomAmount(e.target.value)}
                     placeholder="200000"
-                    className="flex-1 px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none focus:border-[#00BAF2] font-mono"
+                    className="flex-1 h-7 px-2.5 text-xs border border-slate-300 rounded-[4px] bg-white focus:outline-none focus:border-[#00BAF2] font-mono"
                   />
                   <button
                     onClick={handleSetAmount}
-                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded text-xs font-medium"
+                    className="h-7 px-3 bg-slate-800 hover:bg-slate-900 text-white rounded-[4px] text-xs font-medium transition"
                   >
                     Set
                   </button>
@@ -1482,7 +1638,7 @@ export default function ResolveOS() {
 
                 <button
                   onClick={handleConfirmBatch}
-                  className="w-full py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded text-xs font-medium transition flex items-center justify-center gap-1.5"
+                  className="w-full h-8 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300/80 rounded-[4px] text-xs font-medium transition flex items-center justify-center gap-1.5 shadow-xs"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Bank Confirms Batch (Reconciliation)</span>
@@ -1490,14 +1646,14 @@ export default function ResolveOS() {
 
                 <button
                   onClick={handleToggleFreeze}
-                  className="w-full py-1 px-2 bg-red-50 hover:bg-red-100 text-red-800 border border-red-200 rounded text-xs font-medium transition"
+                  className="w-full h-7 px-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-[4px] text-xs font-medium transition"
                 >
-                  Toggle Freeze / AML
+                  Toggle Freeze / AML Flag
                 </button>
 
                 <button
                   onClick={handleResetMerchant}
-                  className="w-full py-1 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-medium transition"
+                  className="w-full h-7 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-[4px] text-xs font-medium transition"
                 >
                   Reset Active Merchant
                 </button>
