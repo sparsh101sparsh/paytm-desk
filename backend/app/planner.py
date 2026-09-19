@@ -181,10 +181,11 @@ Current Transactions in DB: {json.dumps(transactions)}
         )
         return plan, "FIXTURE", 78
 
-    # Case 5: Settlement issue (requires explicit settlement or payment + missing indicators)
-    has_money_signal = any(w in text_lower for w in ["settlement", "paisa", "rupaye", "payment", "rupees", "rs", "credit", "amount"])
+    # Case 5: Settlement issue (handles typos like setlment, sattlement, setlement, payout)
+    settlement_typos = ["settlement", "settle", "setlment", "setlement", "sattlement", "setelment", "payout"]
+    has_money_signal = any(w in text_lower for w in settlement_typos + ["paisa", "rupaye", "payment", "rupees", "rs", "credit", "amount"])
     has_missing_signal = any(w in text_lower for w in ["nahi aaya", "ruka", "phasa", "atack", "pending", "fail", "missing", "kat gaya", "clear karo", "aaya"])
-    is_explicit_settlement = "settlement" in text_lower or (has_money_signal and has_missing_signal)
+    is_explicit_settlement = any(k in text_lower for k in settlement_typos) or (has_money_signal and has_missing_signal)
     if is_explicit_settlement:
         # Check if settlement is failed or account frozen
         if settlements and (settlements[0].get("status") == "FAILED" or "FROZEN" in (settlements[0].get("reason") or "")):
