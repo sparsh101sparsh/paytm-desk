@@ -78,59 +78,85 @@ def reset_demo(body: Dict[str, Any] = None):
 def set_demo_preset(body: Dict[str, Any] = None):
     body = body or {}
     preset = body.get("preset", "L-OK").upper().strip()
-    merchant_id = body.get("merchant_id")
+    merchant_id = body.get("merchant_id") or "m_me"
     conn = get_db()
     cur = conn.cursor()
-    if not merchant_id:
-        cur.execute("SELECT merchant_id FROM tickets ORDER BY created_at DESC LIMIT 1")
-        row = cur.fetchone()
-        merchant_id = row["merchant_id"] if row else "m_me"
 
     now_ts = now_iso()
 
     if preset == "L-OK":
         cur.execute("UPDATE merchants SET risk_flag = NULL WHERE id = ?", (merchant_id,))
-        cur.execute("DELETE FROM settlements WHERE merchant_id = ?", (merchant_id,))
         cur.execute("""
             INSERT INTO settlements (id, merchant_id, ticket_id, amount, status, reason, utr, retry_count, created_at)
             VALUES ('stl_me_01', ?, NULL, 14280.0, 'INITIATED', 'BANK_FILE_PENDING', NULL, 0, ?)
+            ON CONFLICT (id) DO UPDATE SET
+                merchant_id = EXCLUDED.merchant_id,
+                amount = 14280.0,
+                status = 'INITIATED',
+                reason = 'BANK_FILE_PENDING',
+                utr = NULL,
+                retry_count = 0
         """, (merchant_id, now_ts))
     elif preset == "L-PAID":
         cur.execute("UPDATE merchants SET risk_flag = NULL WHERE id = ?", (merchant_id,))
-        cur.execute("DELETE FROM settlements WHERE merchant_id = ?", (merchant_id,))
         cur.execute("""
             INSERT INTO settlements (id, merchant_id, ticket_id, amount, status, reason, utr, retry_count, created_at)
             VALUES ('stl_me_01', ?, NULL, 14280.0, 'SUCCESS', 'SETTLED_TO_BANK', 'PAYTM1928374650', 1, ?)
+            ON CONFLICT (id) DO UPDATE SET
+                merchant_id = EXCLUDED.merchant_id,
+                amount = 14280.0,
+                status = 'SUCCESS',
+                reason = 'SETTLED_TO_BANK',
+                utr = 'PAYTM1928374650',
+                retry_count = 1
         """, (merchant_id, now_ts))
     elif preset == "L-BIG":
         cur.execute("UPDATE merchants SET risk_flag = NULL WHERE id = ?", (merchant_id,))
-        cur.execute("DELETE FROM settlements WHERE merchant_id = ?", (merchant_id,))
         cur.execute("""
             INSERT INTO settlements (id, merchant_id, ticket_id, amount, status, reason, utr, retry_count, created_at)
             VALUES ('stl_me_01', ?, NULL, 200000.0, 'INITIATED', 'BANK_FILE_PENDING', NULL, 0, ?)
+            ON CONFLICT (id) DO UPDATE SET
+                merchant_id = EXCLUDED.merchant_id,
+                amount = 200000.0,
+                status = 'INITIATED',
+                reason = 'BANK_FILE_PENDING',
+                utr = NULL,
+                retry_count = 0
         """, (merchant_id, now_ts))
     elif preset == "L-FROZEN":
         cur.execute("UPDATE merchants SET risk_flag = 'ACCOUNT_FROZEN' WHERE id = ?", (merchant_id,))
-        cur.execute("DELETE FROM settlements WHERE merchant_id = ?", (merchant_id,))
         cur.execute("""
             INSERT INTO settlements (id, merchant_id, ticket_id, amount, status, reason, utr, retry_count, created_at)
             VALUES ('stl_me_01', ?, NULL, 14280.0, 'FAILED', 'ACCOUNT_FROZEN_COMPLIANCE', NULL, 0, ?)
+            ON CONFLICT (id) DO UPDATE SET
+                merchant_id = EXCLUDED.merchant_id,
+                amount = 14280.0,
+                status = 'FAILED',
+                reason = 'ACCOUNT_FROZEN_COMPLIANCE',
+                utr = NULL,
+                retry_count = 0
         """, (merchant_id, now_ts))
     elif preset == "L-RISK":
         cur.execute("UPDATE merchants SET risk_flag = 'AML_FLAGGED' WHERE id = ?", (merchant_id,))
-        cur.execute("DELETE FROM settlements WHERE merchant_id = ?", (merchant_id,))
         cur.execute("""
             INSERT INTO settlements (id, merchant_id, ticket_id, amount, status, reason, utr, retry_count, created_at)
             VALUES ('stl_me_01', ?, NULL, 14280.0, 'INITIATED', 'BANK_FILE_PENDING', NULL, 0, ?)
+            ON CONFLICT (id) DO UPDATE SET
+                merchant_id = EXCLUDED.merchant_id,
+                amount = 14280.0,
+                status = 'INITIATED',
+                reason = 'BANK_FILE_PENDING',
+                utr = NULL,
+                retry_count = 0
         """, (merchant_id, now_ts))
     elif preset == "L-REFUND-AMBIG":
         cur.execute("DELETE FROM transactions WHERE merchant_id = ?", (merchant_id,))
-        cur.execute("INSERT INTO transactions (id, merchant_id, ticket_id, amount, status, utr, created_at) VALUES ('tx_me_01', ?, NULL, 850.0, 'SUCCESS', NULL, ?)", (merchant_id, now_ts))
-        cur.execute("INSERT INTO transactions (id, merchant_id, ticket_id, amount, status, utr, created_at) VALUES ('tx_me_02', ?, NULL, 850.0, 'SUCCESS', NULL, ?)", (merchant_id, now_ts))
-        cur.execute("INSERT INTO transactions (id, merchant_id, ticket_id, amount, status, utr, created_at) VALUES ('tx_me_03', ?, NULL, 850.0, 'SUCCESS', NULL, ?)", (merchant_id, now_ts))
+        cur.execute("INSERT INTO transactions (id, merchant_id, ticket_id, amount, status, utr, created_at) VALUES ('tx_me_01', ?, NULL, 850.0, 'SUCCESS', NULL, ?) ON CONFLICT (id) DO UPDATE SET amount = 850.0, status = 'SUCCESS', utr = NULL", (merchant_id, now_ts))
+        cur.execute("INSERT INTO transactions (id, merchant_id, ticket_id, amount, status, utr, created_at) VALUES ('tx_me_02', ?, NULL, 850.0, 'SUCCESS', NULL, ?) ON CONFLICT (id) DO UPDATE SET amount = 850.0, status = 'SUCCESS', utr = NULL", (merchant_id, now_ts))
+        cur.execute("INSERT INTO transactions (id, merchant_id, ticket_id, amount, status, utr, created_at) VALUES ('tx_me_03', ?, NULL, 850.0, 'SUCCESS', NULL, ?) ON CONFLICT (id) DO UPDATE SET amount = 850.0, status = 'SUCCESS', utr = NULL", (merchant_id, now_ts))
     elif preset == "L-REFUND-OK":
         cur.execute("DELETE FROM transactions WHERE merchant_id = ?", (merchant_id,))
-        cur.execute("INSERT INTO transactions (id, merchant_id, ticket_id, amount, status, utr, created_at) VALUES ('tx_me_01', ?, NULL, 850.0, 'SUCCESS', 'PAYTM8472910384', ?)", (merchant_id, now_ts))
+        cur.execute("INSERT INTO transactions (id, merchant_id, ticket_id, amount, status, utr, created_at) VALUES ('tx_me_01', ?, NULL, 850.0, 'SUCCESS', 'PAYTM8472910384', ?) ON CONFLICT (id) DO UPDATE SET amount = 850.0, status = 'SUCCESS', utr = 'PAYTM8472910384'", (merchant_id, now_ts))
     else:
         conn.close()
         raise HTTPException(status_code=400, detail=f"Unknown preset: {preset}")
