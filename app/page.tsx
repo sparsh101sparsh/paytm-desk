@@ -193,9 +193,15 @@ export default function ResolveOS() {
   const tabItemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const [loading, setLoading] = useState<boolean>(true);
+  const [detailLoading, setDetailLoading] = useState<boolean>(false);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [elapsed, setElapsed] = useState<number>(0);
   const [toast, setToast] = useState<{ type: "success" | "error" | "info"; msg: string } | null>(null);
+
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
 
   // Health state
   const [health, setHealth] = useState<{ status: string; sarvam: string; whatsapp: string; database: string } | null>(null);
@@ -293,7 +299,7 @@ export default function ResolveOS() {
       const res = await fetch(getApiUrl("/api/health"), { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
-        setHealth(data);
+        setHealth((prev) => (JSON.stringify(prev) === JSON.stringify(data) ? prev : data));
         setApiError(false);
       } else {
         setApiError(true);
@@ -308,7 +314,7 @@ export default function ResolveOS() {
       const res = await fetch(getApiUrl("/api/tickets"), { cache: "no-store" });
       if (res.ok) {
         const data: Ticket[] = await res.json();
-        setTickets(data);
+        setTickets((prev) => (JSON.stringify(prev) === JSON.stringify(data) ? prev : data));
         setApiError(false);
 
         if (isInitialLoadRef.current) {
@@ -328,8 +334,11 @@ export default function ResolveOS() {
             (t) => (t.id.startsWith("T-WA") || t.channel === "WhatsApp") && !knownTicketIdsRef.current.has(t.id)
           );
           if (newWaTicket) {
-            setSelectedId(newWaTicket.id);
-            setActiveTab("whatsapp");
+            // Only auto-select if user is on WhatsApp tab or has no active selection
+            // Never hijack activeTab away from Hero/All unexpectedly
+            if (activeTabRef.current === "whatsapp" || !selectedIdRef.current) {
+              setSelectedId(newWaTicket.id);
+            }
             showToast("info", `New WhatsApp message from ${getTicketContact(newWaTicket)}`);
           }
           knownTicketIdsRef.current = new Set(data.map((t) => t.id));
@@ -345,15 +354,16 @@ export default function ResolveOS() {
       const res = await fetch(getApiUrl("/api/demo/ledger"), { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
-        setFallbackLedger(data);
+        setFallbackLedger((prev) => (JSON.stringify(prev) === JSON.stringify(data) ? prev : data));
       }
     } catch {
       // Ignored
     }
   }, []);
 
-  const fetchDetail = useCallback(async (ticketId: string) => {
+  const fetchDetail = useCallback(async (ticketId: string, showIndicator = false) => {
     if (!ticketId) return;
+    if (showIndicator) setDetailLoading(true);
     try {
       const [dRes, eRes] = await Promise.all([
         fetch(getApiUrl(`/api/tickets/${ticketId}`), { cache: "no-store" }),
@@ -361,18 +371,26 @@ export default function ResolveOS() {
       ]);
       if (dRes.ok) {
         const dData = await dRes.json();
-        setDetail(dData);
+        if (ticketId === selectedIdRef.current) {
+          setDetail((prev) => (JSON.stringify(prev) === JSON.stringify(dData) ? prev : dData));
+        }
       }
       if (eRes.ok) {
         const eData = await eRes.json();
-        setEvents(eData);
+        if (ticketId === selectedIdRef.current) {
+          setEvents((prev) => (JSON.stringify(prev) === JSON.stringify(eData) ? prev : eData));
+        }
       }
     } catch {
       // Ignored
+    } finally {
+      if (ticketId === selectedIdRef.current) {
+        setDetailLoading(false);
+      }
     }
   }, []);
 
-  // Poll tickets and health every 1.5s for instant updates
+  // Poll tickets, health, and fallback ledger every 2s with zero unneeded re-renders
   useEffect(() => {
     fetchHealth();
     fetchTickets().then(() => setLoading(false));
@@ -382,7 +400,7 @@ export default function ResolveOS() {
       fetchTickets();
       fetchHealth();
       fetchFallbackLedger();
-    }, 1500);
+    }, 2000);
 
     return () => clearInterval(interval);
   }, [fetchHealth, fetchTickets, fetchFallbackLedger]);
@@ -390,9 +408,9 @@ export default function ResolveOS() {
   // Keep detail & audit events updated for selected ticket
   useEffect(() => {
     if (selectedId) {
-      fetchDetail(selectedId);
+      fetchDetail(selectedId, true);
       const pollTimer = setInterval(() => {
-        fetchDetail(selectedId);
+        fetchDetail(selectedId, false);
       }, 2000);
       return () => clearInterval(pollTimer);
     }
@@ -455,16 +473,17 @@ export default function ResolveOS() {
     }
   }, [filteredTickets, selectedId]);
 
-  const selectedTicket = detail?.ticket || tickets.find((t) => t.id === selectedId) || null;
+  const isDetailMatching = Boolean(detail && detail.ticket && detail.ticket.id === selectedId);
+  const selectedTicket = (isDetailMatching ? detail?.ticket : null) || tickets.find((t) => t.id === selectedId) || null;
 
   const primarySettlement =
-    detail?.settlements && detail.settlements.length > 0
+    isDetailMatching && detail?.settlements && detail.settlements.length > 0
       ? detail.settlements[0]
       : fallbackLedger?.settlements && fallbackLedger.settlements.length > 0
       ? fallbackLedger.settlements[0]
       : null;
 
-  const activeMerchant = detail?.merchant || fallbackLedger?.merchant;
+  const activeMerchant = (isDetailMatching && detail?.merchant) || fallbackLedger?.merchant;
   const activeMerchantId = selectedTicket?.merchant_id || activeMerchant?.id || "m_me";
 
   const isContradiction =
@@ -652,11 +671,11 @@ export default function ResolveOS() {
   };
 
   // ─── Stations ──────────────────────────────────────────────────────────────
-
-  const understoodEv = events.find((e) => e.type === "UNDERSTOOD");
-  const recalledEv = events.find((e) => e.type === "RECALLED");
-  const decidedEv = events.find((e) => e.type === "DECIDED");
-  const actedEv = events.find((e) => e.type === "ACTED");
+  const matchingEvents = isDetailMatching ? events : [];
+  const understoodEv = matchingEvents.find((e) => e.type === "UNDERSTOOD");
+  const recalledEv = matchingEvents.find((e) => e.type === "RECALLED");
+  const decidedEv = matchingEvents.find((e) => e.type === "DECIDED");
+  const actedEv = matchingEvents.find((e) => e.type === "ACTED");
 
   const stations = [
     {
@@ -1085,7 +1104,7 @@ export default function ResolveOS() {
             ═══════════════════════════════════════════════════════════════════ */}
         <main className="flex-1 flex flex-col min-w-0 ros-ambient-canvas overflow-y-auto">
           {selectedTicket ? (
-            <div className="p-6 max-w-4xl w-full mx-auto space-y-4">
+            <div className={`p-6 max-w-4xl w-full mx-auto space-y-4 transition-opacity duration-200 ${isDetailMatching || !detailLoading ? "opacity-100" : "opacity-80"}`}>
               {/* 3a. Case Header with Surface Elevation & Specular Top Accent */}
               <div className="ros-card-elevated rounded-xl p-5 relative overflow-hidden flex items-center justify-between gap-4 border border-slate-200/90">
                 <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-[#002970] via-[#00BAF2] to-transparent" />
@@ -1101,16 +1120,16 @@ export default function ResolveOS() {
                   </div>
                   <div className="text-xs font-normal text-slate-500 mt-1 flex items-center gap-1.5">
                     <span className="font-mono font-semibold text-slate-800">
-                      {detail?.merchant?.phone ? formatPhone(detail.merchant.phone) : (detail?.merchant?.name || selectedTicket.merchant_name)}
+                      {activeMerchant?.phone ? formatPhone(activeMerchant.phone) : (activeMerchant?.name || selectedTicket.merchant_name)}
                     </span>
-                    {detail?.merchant?.name && (
+                    {activeMerchant?.name && (
                       <>
                         <span>&middot;</span>
-                        <span className="font-medium text-slate-700">{detail.merchant.name}</span>
+                        <span className="font-medium text-slate-700">{activeMerchant.name}</span>
                       </>
                     )}
                     <span>&middot;</span>
-                    <span>{detail?.merchant?.city || selectedTicket.merchant_city || "Delhi NCR"}</span>
+                    <span>{activeMerchant?.city || selectedTicket.merchant_city || "Delhi NCR"}</span>
                     <span>&middot;</span>
                     <span className="font-mono text-slate-400">{selectedTicket.merchant_id}</span>
                   </div>
@@ -1208,9 +1227,9 @@ export default function ResolveOS() {
                   {stations.map((st) => (
                     <div
                       key={st.num}
-                      className={`p-3 rounded-xl border text-left flex flex-col justify-between min-h-[82px] transition-all duration-200 ${
+                      className={`p-3 rounded-xl border text-left flex flex-col justify-between min-h-[82px] transition-all duration-300 ease-in-out ${
                         st.active
-                          ? "bg-gradient-to-b from-cyan-50/70 to-white border-[#00BAF2] ring-2 ring-[#00BAF2]/30 shadow-[0_0_12px_rgba(0,186,242,0.2)] animate-pulse"
+                          ? "bg-gradient-to-b from-cyan-50/70 to-white border-[#00BAF2] ring-2 ring-[#00BAF2]/30 shadow-[0_0_12px_rgba(0,186,242,0.2)]"
                           : st.done
                           ? "bg-white border-emerald-300 shadow-xs"
                           : "bg-slate-50/80 border-slate-200/80"
@@ -1300,20 +1319,25 @@ export default function ResolveOS() {
                   {/* Inbound WhatsApp Message */}
                   <div className="bg-white border border-slate-200/80 rounded-2xl rounded-tl-sm p-3.5 text-xs text-slate-800 shadow-sm space-y-1">
                     <div className="text-[10px] font-semibold text-[#002970] flex items-center justify-between">
-                      <span className="font-mono">{detail?.merchant?.phone ? formatPhone(detail.merchant.phone) : (detail?.merchant?.name || selectedTicket.merchant_name)}</span>
+                      <span className="font-mono">{activeMerchant?.phone ? formatPhone(activeMerchant.phone) : (activeMerchant?.name || selectedTicket.merchant_name)}</span>
                       <span className="text-slate-400 font-normal">{timeAgo(selectedTicket.created_at)}</span>
                     </div>
                     <div className="text-[13px] leading-relaxed text-slate-800">{selectedTicket.text}</div>
                   </div>
 
                   {/* Outbound WhatsApp Message */}
-                  {detail?.latest_whatsapp ? (
+                  {isDetailMatching && detail?.latest_whatsapp ? (
                     <div className="bg-[#E7F8E8] border border-emerald-200/70 rounded-2xl rounded-tr-sm p-3.5 text-xs text-slate-900 ml-6 shadow-sm space-y-1">
                       <div className="text-[10px] font-semibold text-emerald-800 flex items-center justify-between">
                         <span>Resolve OS Bot &middot; {detail.latest_whatsapp.template_id}</span>
                         <span className="text-emerald-700 font-bold tracking-wider">✓✓ DELIVERED</span>
                       </div>
                       <div className="text-[13px] leading-relaxed text-slate-900">{detail.latest_whatsapp.body}</div>
+                    </div>
+                  ) : detailLoading ? (
+                    <div className="text-slate-400 text-xs italic pl-2 py-1 flex items-center gap-1.5">
+                      <RotateCcw className="w-3 h-3 animate-spin text-[#00BAF2]" />
+                      <span>Checking WhatsApp delivery status...</span>
                     </div>
                   ) : (
                     <div className="text-slate-400 text-xs italic pl-2 py-1">
@@ -1389,8 +1413,8 @@ export default function ResolveOS() {
               <span className="text-[10px] font-bold tracking-[0.08em] uppercase text-slate-500">
                 Settlement Ledger
               </span>
-              <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200">
-                SQLite &middot; Live
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300 tracking-wider">
+                TEST DATA &middot; Live
               </span>
             </div>
 
@@ -1420,25 +1444,25 @@ export default function ResolveOS() {
                     {primarySettlement.status}
                   </span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-100">
+                <div className="flex justify-between py-1 border-b border-slate-100 items-center">
                   <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">RETRIES</span>
-                  <span className="text-slate-800 font-medium">{primarySettlement.retry_count} / 2</span>
+                  <span className="font-mono text-slate-700">{primarySettlement.retry_count || 0}/2</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">UTR</span>
-                  <span className="font-mono text-slate-800 font-medium">{primarySettlement.utr || "—"}</span>
-                </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">FREEZE / AML</span>
-                  <span className={primarySettlement.reason?.includes("FROZEN") ? "text-red-600 font-bold" : "text-slate-700 font-medium"}>
-                    {primarySettlement.reason?.includes("FROZEN") ? "YES · AML" : "No"}
-                  </span>
-                </div>
+                {primarySettlement.utr && (
+                  <div className="flex justify-between py-1 border-b border-slate-100 items-center">
+                    <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">BANK UTR</span>
+                    <span className="font-mono text-emerald-700 font-semibold text-[11px]">{primarySettlement.utr}</span>
+                  </div>
+                )}
+                {activeMerchant?.risk_flag && (
+                  <div className="flex justify-between py-1 border-b border-slate-100 items-center">
+                    <span className="text-rose-600 uppercase text-[10px] font-bold tracking-[0.06em]">COMPLIANCE FLAG</span>
+                    <span className="font-mono text-rose-700 font-bold text-[11px]">{activeMerchant.risk_flag}</span>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="text-slate-400 py-3 text-center text-xs">
-                No active settlement batch in DB.
-              </div>
+              <div className="text-slate-400 py-3 text-center text-xs">No active settlement on file</div>
             )}
           </div>
 
@@ -1500,65 +1524,6 @@ export default function ResolveOS() {
               </div>
             </div>
           )}
-
-          {/* Card 2: Settlement Ledger (FIRST, ALWAYS) */}
-          <div className="ros-card rounded-xl p-4 shadow-sm border border-slate-200/90 space-y-2.5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <span className="text-[10px] font-bold tracking-[0.08em] uppercase text-slate-500">
-                Settlement Ledger
-              </span>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300 tracking-wider">
-                TEST DATA &middot; Live
-              </span>
-            </div>
-
-            {primarySettlement ? (
-              <div className="space-y-2 text-xs font-normal">
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">BATCH ID</span>
-                  <span className="font-mono text-slate-900 font-medium">{primarySettlement.id}</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-100 items-center">
-                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">AMOUNT</span>
-                  <span className="text-sm font-bold text-[#002970] font-mono">
-                    {formatRupees(primarySettlement.amount)}
-                  </span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-100 items-center">
-                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">STATUS</span>
-                  <span
-                    className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold tracking-wide border ${
-                      primarySettlement.status === "SUCCESS"
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-300"
-                        : primarySettlement.status === "FAILED"
-                        ? "bg-rose-50 text-rose-700 border-rose-300"
-                        : "bg-amber-50 text-amber-700 border-amber-300"
-                    }`}
-                  >
-                    {primarySettlement.status}
-                  </span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-100 items-center">
-                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">RETRIES</span>
-                  <span className="font-mono text-slate-700">{primarySettlement.retry_count || 0}/2</span>
-                </div>
-                {primarySettlement.utr && (
-                  <div className="flex justify-between py-1 border-b border-slate-100 items-center">
-                    <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">BANK UTR</span>
-                    <span className="font-mono text-emerald-700 font-semibold text-[11px]">{primarySettlement.utr}</span>
-                  </div>
-                )}
-                {activeMerchant?.risk_flag && (
-                  <div className="flex justify-between py-1 border-b border-slate-100 items-center">
-                    <span className="text-rose-600 uppercase text-[10px] font-bold tracking-[0.06em]">COMPLIANCE FLAG</span>
-                    <span className="font-mono text-rose-700 font-bold text-[11px]">{activeMerchant.risk_flag}</span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-slate-400 py-3 text-center text-xs">No active settlement on file</div>
-            )}
-          </div>
 
           {/* Card 3: Paytm Device Registry */}
           <div className="ros-card rounded-xl p-4 shadow-sm border border-slate-200/90 space-y-2.5">
