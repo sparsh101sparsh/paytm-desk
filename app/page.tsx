@@ -22,7 +22,17 @@ import {
   ArrowRight,
   GripVertical,
   Phone,
+  Users,
+  CreditCard,
+  ShieldCheck,
+  BarChart3,
 } from "lucide-react";
+import {
+  MerchantDirectoryView,
+  SettlementsView,
+  PolicyConsoleView,
+  AnalyticsView,
+} from "./components/views";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -184,6 +194,7 @@ export default function ResolveOS() {
   const [detail, setDetail] = useState<TicketDetail | null>(null);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [fallbackLedger, setFallbackLedger] = useState<{ merchant: any; settlements: Settlement[] } | null>(null);
+  const [viewMode, setViewMode] = useState<"desk" | "merchants" | "settlements" | "policy" | "analytics">("desk");
 
   // Tab State & Gliding Indicator Tracking (NETRA Pattern)
   const [activeTab, setActiveTab] = useState<"whatsapp" | "all">("whatsapp");
@@ -720,30 +731,94 @@ export default function ResolveOS() {
     <div className={`flex flex-col h-screen w-screen overflow-hidden bg-[#F5F7FB] text-[#1B1F3B] font-sans antialiased ${
       isDraggingLeft || isDraggingRight ? "select-none cursor-col-resize" : "select-none"
     }`}>
-      {/* ─── Top Bar (40px Paytm Navy #002970) ─────────────────────────────── */}
-      <header className="h-[40px] shrink-0 bg-[#002970] border-b border-[#00BAF2]/30 flex items-center justify-between px-4 z-20">
+      {/* ─── Top Bar (44px Paytm Navy #002970) ─────────────────────────────── */}
+      <header className="h-[44px] shrink-0 bg-[#002970] border-b border-[#00BAF2]/30 flex items-center justify-between px-3 sm:px-4 z-20 gap-2">
         {/* Left: Brand */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0 cursor-pointer" onClick={() => setViewMode("desk")}>
           <img
             src="/favicon.svg"
             alt="Resolve OS"
             className="w-5 h-5 rounded object-contain shrink-0"
           />
           <span className="text-white font-medium text-[14px] tracking-tight">Resolve OS</span>
-          <span className="text-white/70 text-xs font-normal">Merchant Support</span>
+          <span className="text-white/70 text-xs font-normal hidden lg:inline">Merchant Support</span>
         </div>
 
+        {/* Center: Navigation Tabs */}
+        <nav className="flex items-center gap-1 overflow-x-auto py-0.5" style={{ scrollbarWidth: "none" }}>
+          <button
+            type="button"
+            onClick={() => setViewMode("desk")}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition shrink-0 ${
+              viewMode === "desk"
+                ? "bg-white/20 text-white border border-white/25 shadow-sm"
+                : "text-white/75 hover:text-white hover:bg-white/10"
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${viewMode === "desk" ? "bg-[#00BAF2] animate-pulse" : "bg-white/40"}`} />
+            <span>Live Desk</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("merchants")}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition shrink-0 ${
+              viewMode === "merchants"
+                ? "bg-white/20 text-white border border-white/25 shadow-sm"
+                : "text-white/75 hover:text-white hover:bg-white/10"
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Merchants</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("settlements")}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition shrink-0 ${
+              viewMode === "settlements"
+                ? "bg-white/20 text-white border border-white/25 shadow-sm"
+                : "text-white/75 hover:text-white hover:bg-white/10"
+            }`}
+          >
+            <CreditCard className="w-3.5 h-3.5" />
+            <span>Payouts</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("policy")}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition shrink-0 ${
+              viewMode === "policy"
+                ? "bg-white/20 text-white border border-white/25 shadow-sm"
+                : "text-white/75 hover:text-white hover:bg-white/10"
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Policy Matrix</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("analytics")}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition shrink-0 ${
+              viewMode === "analytics"
+                ? "bg-white/20 text-white border border-white/25 shadow-sm"
+                : "text-white/75 hover:text-white hover:bg-white/10"
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span>Analytics &amp; ROI</span>
+          </button>
+        </nav>
+
         {/* Right: Telemetry Health Badges */}
-        <div className="flex items-center gap-2 text-[11px] text-white/90 font-normal">
-          <div className="flex items-center gap-1.5 h-7 px-2.5 rounded-[4px] bg-white/10 border border-white/15 shadow-sm" title="SQLite Database">
+        <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] text-white/90 font-normal shrink-0">
+          <div className="flex items-center gap-1.5 h-7 px-2 sm:px-2.5 rounded-[4px] bg-white/10 border border-white/15 shadow-sm" title="PostgreSQL Database (Supabase, AWS Mumbai)">
             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${apiError ? "bg-red-400" : "bg-emerald-400"}`} />
-            <span className="hidden sm:inline font-medium">API</span>
+            <span className="hidden sm:inline font-medium">Postgres</span>
           </div>
-          <div className="flex items-center gap-1.5 h-7 px-2.5 rounded-[4px] bg-white/10 border border-white/15 shadow-sm" title={health?.sarvam === "live" ? "Sarvam 105B Live" : "Sarvam Fixture"}>
+          <div className="flex items-center gap-1.5 h-7 px-2 sm:px-2.5 rounded-[4px] bg-white/10 border border-white/15 shadow-sm" title={health?.sarvam === "live" ? "Sarvam 105B Live" : "Sarvam Fixture"}>
             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${health?.sarvam === "live" ? "bg-emerald-400" : "bg-amber-400"}`} />
             <span className="hidden sm:inline font-medium">Sarvam</span>
           </div>
-          <div className="flex items-center gap-1.5 h-7 px-2.5 rounded-[4px] bg-white/10 border border-white/15 shadow-sm" title="Meta WhatsApp Cloud API">
+          <div className="flex items-center gap-1.5 h-7 px-2 sm:px-2.5 rounded-[4px] bg-white/10 border border-white/15 shadow-sm" title="Meta WhatsApp Cloud API">
             <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-emerald-400" />
             <span className="hidden sm:inline font-medium">WhatsApp</span>
           </div>
@@ -924,10 +999,11 @@ export default function ResolveOS() {
         </div>
       )}
 
-      {/* ─── Main 3-Column Ops Desk ──────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* ═══════════════════════════════════════════════════════════════════
-            COLUMN 1: Queue (Resizable width)
+      {/* ─── Main Content (Desk or Selected View) ─────────────────────────── */}
+      {viewMode === "desk" ? (
+        <div className="flex flex-1 overflow-hidden">
+          {/* ═══════════════════════════════════════════════════════════════════
+              COLUMN 1: Queue (Resizable width)
             ═══════════════════════════════════════════════════════════════════ */}
         <aside
           style={{ width: `${queueWidth}px` }}
@@ -1712,6 +1788,22 @@ export default function ResolveOS() {
           </div>
         </aside>
       </div>
+      ) : (
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 max-w-7xl mx-auto w-full">
+          {viewMode === "merchants" && (
+            <MerchantDirectoryView onSwitchToDesk={() => setViewMode("desk")} />
+          )}
+          {viewMode === "settlements" && (
+            <SettlementsView onSwitchToDesk={() => setViewMode("desk")} />
+          )}
+          {viewMode === "policy" && (
+            <PolicyConsoleView onSwitchToDesk={() => setViewMode("desk")} />
+          )}
+          {viewMode === "analytics" && (
+            <AnalyticsView onSwitchToDesk={() => setViewMode("desk")} />
+          )}
+        </main>
+      )}
 
       {/* ─── Toast Notifications ─────────────────────────────────────────── */}
       {toast && (
