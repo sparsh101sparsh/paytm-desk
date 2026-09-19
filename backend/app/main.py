@@ -47,9 +47,18 @@ app.add_middleware(
 @app.get("/api/health")
 def health():
     db_type = "postgres:supabase" if is_postgres() else "sqlite:local"
+    db_err = None
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        conn.close()
+    except Exception as e:
+        db_err = f"{type(e).__name__}: {str(e)}"
     return {
-        "status": "healthy",
+        "status": "healthy" if not db_err else "degraded",
         "database": db_type,
+        "database_error": db_err,
         "sarvam": "active" if SARVAM_API_KEY else "fixture_fallback",
         "whatsapp": "meta_cloud_api",
         "policy_engine": "active",
