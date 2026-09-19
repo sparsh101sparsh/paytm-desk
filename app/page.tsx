@@ -1040,10 +1040,16 @@ export default function ResolveOS() {
                             ? "bg-emerald-50 text-emerald-800 border border-emerald-300"
                             : ticket.status === "WAITING" || ticket.status === "WAITING_ON_MERCHANT"
                             ? "bg-amber-50 text-amber-800 border border-amber-300"
+                            : ticket.status === "CLOSED_REJECTED"
+                            ? "bg-slate-100 text-slate-700 border border-slate-300"
                             : "bg-red-50 text-red-800 border border-red-300"
                         }`}
                       >
-                        {ticket.status === "WAITING_ON_MERCHANT" ? "WAITING" : ticket.status}
+                        {ticket.status === "WAITING_ON_MERCHANT"
+                          ? "WAITING"
+                          : ticket.status === "CLOSED_REJECTED"
+                          ? "REJECTED"
+                          : ticket.status}
                       </span>
                     </div>
 
@@ -1096,58 +1102,56 @@ export default function ResolveOS() {
               {/* 3a. Case Header with Surface Elevation & Specular Top Accent */}
               <div className="ros-card-elevated rounded-xl p-5 relative overflow-hidden flex items-center justify-between gap-4 border border-slate-200/90">
                 <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-[#002970] via-[#00BAF2] to-transparent" />
-                <div>
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2.5">
-                    <span className="text-lg font-bold text-[#002970] font-mono tracking-tight px-2.5 py-0.5 rounded-[4px] bg-[#002970]/5 border border-[#002970]/15">
+                    <span className="text-lg font-bold text-[#002970] font-mono tracking-tight px-2.5 py-0.5 rounded-[4px] bg-[#002970]/5 border border-[#002970]/15 whitespace-nowrap shrink-0">
                       {selectedTicket.id}
                     </span>
-                    <span className="text-slate-300">·</span>
-                    <span className="text-base font-semibold text-slate-800">
+                    <span className="text-slate-300 shrink-0">·</span>
+                    <span className="text-base font-semibold text-slate-800 truncate">
                       {selectedTicket.intent || "Merchant Operations Dispute"}
                     </span>
                   </div>
-                  <div className="text-xs font-normal text-slate-500 mt-1 flex items-center gap-1.5">
-                    <span className="font-mono font-semibold text-slate-800">
+                  <div className="text-xs font-normal text-slate-500 mt-1 flex items-center gap-1.5 truncate">
+                    <span className="font-mono font-semibold text-slate-800 shrink-0">
                       {activeMerchant?.phone ? formatPhone(activeMerchant.phone) : (activeMerchant?.name || selectedTicket.merchant_name)}
                     </span>
                     {activeMerchant?.name && (
                       <>
                         <span>&middot;</span>
-                        <span className="font-medium text-slate-700">{activeMerchant.name}</span>
+                        <span className="font-medium text-slate-700 truncate">{activeMerchant.name}</span>
                       </>
                     )}
                     <span>&middot;</span>
-                    <span>{activeMerchant?.city || selectedTicket.merchant_city || "Delhi NCR"}</span>
+                    <span className="shrink-0">{activeMerchant?.city || selectedTicket.merchant_city || "Delhi NCR"}</span>
                     <span>&middot;</span>
-                    <span className="font-mono text-slate-400">{selectedTicket.merchant_id}</span>
+                    <span className="font-mono text-slate-400 shrink-0">{selectedTicket.merchant_id}</span>
                   </div>
                 </div>
 
                 {/* Primary Actions */}
                 <div className="flex items-center gap-2.5 shrink-0">
-                  {selectedTicket.status === "ESCALATED" && (
+                  {selectedTicket.status === "ESCALATED" ? (
                     <>
                       <button
                         onClick={handleApprove}
-                        className="h-8 px-3.5 rounded-[4px] text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition active:scale-95 flex items-center gap-1.5 shadow-sm"
+                        className="h-8 px-3.5 rounded-[4px] text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition active:scale-95 flex items-center gap-1.5 shadow-sm whitespace-nowrap"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>Approve Override</span>
                       </button>
                       <button
                         onClick={handleReject}
-                        className="h-8 px-3 rounded-[4px] text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition active:scale-95 flex items-center gap-1.5"
+                        className="h-8 px-3 rounded-[4px] text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition active:scale-95 flex items-center gap-1.5 whitespace-nowrap"
                       >
                         <AlertCircle className="w-3.5 h-3.5" />
                         <span>Reject Ticket</span>
                       </button>
                     </>
-                  )}
-
-                  {cannotAutoRetry ? (
+                  ) : cannotAutoRetry ? (
                     <button
                       disabled
-                      className="h-8 px-4 rounded-[4px] text-xs font-medium bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed flex items-center gap-1.5"
+                      className="h-8 px-4 rounded-[4px] text-xs font-medium bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed flex items-center gap-1.5 whitespace-nowrap"
                     >
                       Run Resolve OS
                     </button>
@@ -1155,7 +1159,7 @@ export default function ResolveOS() {
                     <button
                       onClick={handleRun}
                       disabled={isRunning}
-                      className="h-8 px-4 rounded-[4px] text-xs font-medium bg-gradient-to-r from-[#002970] to-[#001f56] hover:from-[#001a4d] hover:to-[#00153a] text-white transition active:scale-95 flex items-center gap-2 border border-[#00BAF2]/40 shadow-[0_2px_8px_rgba(0,41,112,0.25)] hover:shadow-[0_4px_14px_rgba(0,186,242,0.3)] disabled:opacity-75 disabled:cursor-wait"
+                      className="h-8 px-4 rounded-[4px] text-xs font-medium bg-gradient-to-r from-[#002970] to-[#001f56] hover:from-[#001a4d] hover:to-[#00153a] text-white transition active:scale-95 flex items-center gap-2 border border-[#00BAF2]/40 shadow-[0_2px_8px_rgba(0,41,112,0.25)] hover:shadow-[0_4px_14px_rgba(0,186,242,0.3)] disabled:opacity-75 disabled:cursor-wait whitespace-nowrap"
                     >
                       {isRunning ? (
                         <>
@@ -1255,9 +1259,29 @@ export default function ResolveOS() {
                     <CheckCircle2 className="w-5 h-5 text-emerald-700" />
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-emerald-900">RESOLVED · Settlement retried</div>
+                    <div className="text-sm font-semibold text-emerald-900">
+                      {actedEv?.payload?.tool === "human_override_approve"
+                        ? "RESOLVED · Supervisor Override Approved"
+                        : "RESOLVED · Settlement retried"}
+                    </div>
                     <div className="text-xs font-normal text-emerald-800 mt-0.5">
-                      Batch re-pushed to bank file. Expected in merchant account within 2 hours.
+                      {actedEv?.payload?.tool === "human_override_approve"
+                        ? "Operator manually authorized batch retry and issued UTR to merchant."
+                        : "Batch re-pushed to bank file. Expected in merchant account within 2 hours."}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedTicket.status === "CLOSED_REJECTED" && (
+                <div className="p-4 bg-gradient-to-r from-slate-50/90 via-white to-slate-50/40 border border-slate-300 rounded-xl text-slate-950 flex items-center gap-3.5 shadow-[0_4px_16px_rgba(100,116,139,0.12)]">
+                  <div className="size-9 rounded-lg bg-slate-100 border border-slate-300 flex items-center justify-center shrink-0">
+                    <AlertCircle className="w-5 h-5 text-slate-700" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">CLOSED · Ticket Rejected by Supervisor</div>
+                    <div className="text-xs font-normal text-slate-700 mt-0.5">
+                      Operator reviewed risk flags and rejected override. Merchant notified via WhatsApp.
                     </div>
                   </div>
                 </div>
