@@ -186,7 +186,7 @@ export default function ResolveOS() {
   const [fallbackLedger, setFallbackLedger] = useState<{ merchant: any; settlements: Settlement[] } | null>(null);
 
   // Tab State & Gliding Indicator Tracking (NETRA Pattern)
-  const [activeTab, setActiveTab] = useState<"hero" | "whatsapp" | "all">("whatsapp");
+  const [activeTab, setActiveTab] = useState<"whatsapp" | "all">("whatsapp");
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const [tabPillStyle, setTabPillStyle] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const tabsContainerRef = useRef<HTMLDivElement>(null);
@@ -320,14 +320,9 @@ export default function ResolveOS() {
         if (isInitialLoadRef.current) {
           isInitialLoadRef.current = false;
           knownTicketIdsRef.current = new Set(data.map((t) => t.id));
-          const hasLiveWa = data.some((t) => t.id.startsWith("T-WA"));
-          if (hasLiveWa) {
-            setActiveTab("whatsapp");
-            const latestWa = data.find((t) => t.id.startsWith("T-WA"));
-            if (latestWa) setSelectedId(latestWa.id);
-          } else {
-            setActiveTab("hero");
-          }
+          setActiveTab("whatsapp");
+          const latestTicket = data.find((t) => t.id.startsWith("T-WA") || t.channel === "WhatsApp") || data[0];
+          if (latestTicket) setSelectedId(latestTicket.id);
         } else {
           // Find any newly arrived WhatsApp ticket
           const newWaTicket = data.find(
@@ -448,14 +443,9 @@ export default function ResolveOS() {
   }, [hoveredTab, activeTab, queueWidth]);
 
   // ─── Filtered Tickets & Active Entities ────────────────────────────────────
-  const heroIds = ["T-1042", "T-1048", "T-1055", "T-1061", "T-1067"];
-
   const filteredTickets = useMemo(() => {
-    if (activeTab === "hero") {
-      return tickets.filter((t) => heroIds.includes(t.id));
-    }
     if (activeTab === "whatsapp") {
-      return tickets.filter((t) => t.id.startsWith("T-WA"));
+      return tickets.filter((t) => t.id.startsWith("T-WA") || t.channel === "WhatsApp");
     }
     return tickets;
   }, [tickets, activeTab]);
@@ -715,17 +705,15 @@ export default function ResolveOS() {
     },
   ];
 
-  const heroCount = useMemo(() => tickets.filter((t) => heroIds.includes(t.id)).length, [tickets, heroIds]);
   const waCount = useMemo(
-    () => tickets.filter((t) => t.id.startsWith("T-WA") || (t.channel === "WhatsApp" && !heroIds.includes(t.id))).length,
-    [tickets, heroIds]
+    () => tickets.filter((t) => t.id.startsWith("T-WA") || t.channel === "WhatsApp").length,
+    [tickets]
   );
   const allCount = tickets.length;
 
   const TAB_ITEMS = [
-    { id: "hero", label: "Hero demo", count: heroCount },
     { id: "whatsapp", label: "WhatsApp live", count: waCount },
-    { id: "all", label: "All", count: allCount },
+    { id: "all", label: "All tickets", count: allCount },
   ] as const;
 
   return (
