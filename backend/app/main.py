@@ -67,9 +67,78 @@ def health():
 
 @app.post("/demo/reset")
 @app.post("/api/demo/reset")
-def reset_demo():
-    seed_database(seed_hero_tickets=True)
-    return {"status": "ok", "message": "Demo reset: hero tickets loaded, test ledger initialized."}
+def reset_demo(body: Dict[str, Any] = None):
+    body = body or {}
+    seed_hero = bool(body.get("seed_hero_tickets", False))
+    seed_database(seed_hero_tickets=seed_hero)
+    return {"status": "ok", "message": "Demo reset: tickets cleared, test ledger initialized to L-OK (₹14,280 INITIATED)."}
+
+@app.post("/demo/preset")
+@app.post("/api/demo/preset")
+def set_demo_preset(body: Dict[str, Any] = None):
+    body = body or {}
+    preset = body.get("preset", "L-OK").upper().strip()
+    merchant_id = body.get("merchant_id")
+    conn = get_db()
+    cur = conn.cursor()
+    if not merchant_id:
+        cur.execute("SELECT merchant_id FROM tickets ORDER BY created_at DESC LIMIT 1")
+        row = cur.fetchone()
+        merchant_id = row["merchant_id"] if row else "m_me"
+
+    now_ts = now_iso()
+
+    if preset == "L-OK":
+        cur.execute("UPDATE merchants SET risk_flag = NULL WHERE id = ?", (merchant_id,))
+        cur.execute("DELETE FROM settlements WHERE merchant_id = ?", (merchant_id,))
+        cur.execute("""
+            INSERT INTO settlements (id, merchant_id, ticket_id, amount, status, reason, utr, retry_count, created_at)
+            VALUES ('stl_me_01', ?, NULL, 14280.0, 'INITIATED', 'BANK_FILE_PENDING', NULL, 0, ?)
+        """, (merchant_id, now_ts))
+    elif preset == "L-PAID":
+        cur.execute("UPDATE merchants SET risk_flag = NULL WHERE id = ?", (merchant_id,))
+        cur.execute("DELETE FROM settlements WHERE merchant_id = ?", (merchant_id,))
+        cur.execute("""
+            INSERT INTO settlements (id, merchant_id, ticket_id, amount, status, reason, utr, retry_count, created_at)
+            VALUES ('stl_me_01', ?, NULL, 14280.0, 'SUCCESS', 'SETTLED_TO_BANK', 'PAYTM1928374650', 1, ?)
+        """, (merchant_id, now_ts))
+    elif preset == "L-BIG":
+        cur.execute("UPDATE merchants SET risk_flag = NULL WHERE id = ?", (merchant_id,))
+        cur.execute("DELETE FROM settlements WHERE merchant_id = ?", (merchant_id,))
+        cur.execute("""
+            INSERT INTO settlements (id, merchant_id, ticket_id, amount, status, reason, utr, retry_count, created_at)
+            VALUES ('stl_me_01', ?, NULL, 200000.0, 'INITIATED', 'BANK_FILE_PENDING', NULL, 0, ?)
+        """, (merchant_id, now_ts))
+    elif preset == "L-FROZEN":
+        cur.execute("UPDATE merchants SET risk_flag = 'ACCOUNT_FROZEN' WHERE id = ?", (merchant_id,))
+        cur.execute("DELETE FROM settlements WHERE merchant_id = ?", (merchant_id,))
+        cur.execute("""
+            INSERT INTO settlements (id, merchant_id, ticket_id, amount, status, reason, utr, retry_count, created_at)
+            VALUES ('stl_me_01', ?, NULL, 14280.0, 'FAILED', 'ACCOUNT_FROZEN_COMPLIANCE', NULL, 0, ?)
+        """, (merchant_id, now_ts))
+    elif preset == "L-RISK":
+        cur.execute("UPDATE merchants SET risk_flag = 'AML_FLAGGED' WHERE id = ?", (merchant_id,))
+        cur.execute("DELETE FROM settlements WHERE merchant_id = ?", (merchant_id,))
+        cur.execute("""
+            INSERT INTO settlements (id, merchant_id, ticket_id, amount, status, reason, utr, retry_count, created_at)
+            VALUES ('stl_me_01', ?, NULL, 14280.0, 'INITIATED', 'BANK_FILE_PENDING', NULL, 0, ?)
+        """, (merchant_id, now_ts))
+    elif preset == "L-REFUND-AMBIG":
+        cur.execute("DELETE FROM transactions WHERE merchant_id = ?", (merchant_id,))
+        cur.execute("INSERT INTO transactions (id, merchant_id, ticket_id, amount, status, utr, created_at) VALUES ('tx_me_01', ?, NULL, 850.0, 'SUCCESS', NULL, ?)", (merchant_id, now_ts))
+        cur.execute("INSERT INTO transactions (id, merchant_id, ticket_id, amount, status, utr, created_at) VALUES ('tx_me_02', ?, NULL, 850.0, 'SUCCESS', NULL, ?)", (merchant_id, now_ts))
+        cur.execute("INSERT INTO transactions (id, merchant_id, ticket_id, amount, status, utr, created_at) VALUES ('tx_me_03', ?, NULL, 850.0, 'SUCCESS', NULL, ?)", (merchant_id, now_ts))
+    elif preset == "L-REFUND-OK":
+        cur.execute("DELETE FROM transactions WHERE merchant_id = ?", (merchant_id,))
+        cur.execute("INSERT INTO transactions (id, merchant_id, ticket_id, amount, status, utr, created_at) VALUES ('tx_me_01', ?, NULL, 850.0, 'SUCCESS', 'PAYTM8472910384', ?)", (merchant_id, now_ts))
+    else:
+        conn.close()
+        raise HTTPException(status_code=400, detail=f"Unknown preset: {preset}")
+
+    conn.commit()
+    conn.close()
+    return {"status": "ok", "preset": preset, "merchant_id": merchant_id}
+
 
 @app.post("/api/demo/set-amount")
 def demo_set_amount(body: Dict[str, Any]):
@@ -743,31 +812,28 @@ async def receive_meta_whatsapp(request: Request, background_tasks: BackgroundTa
     msg_type = msg.get("type", "")
     msg_id = msg.get("id")
 
-    sender_text = ""
-    if msg_type == "text":
-        sender_text = msg.get("text", {}).get("body", "").strip()
-    elif msg_type == "image":
-        caption = msg.get("image", {}).get("caption", "").strip()
-        sender_text = f"[Image] {caption}".strip() if caption else "Merchant sent a photo of Soundbox / QR standee"
-    elif msg_type == "audio":
-        sender_text = "Merchant sent a voice note regarding support"
-    elif msg_type == "document":
-        filename = msg.get("document", {}).get("filename", "document")
-        sender_text = f"Merchant shared document: {filename}"
-    else:
-        sender_text = f"Merchant sent message of type: {msg_type}"
-
-    if not sender_text:
-        return {"status": "empty_body"}
-
-    text_lower = sender_text.lower().strip()
-    clean_phone = "".join(filter(str.isdigit, sender_phone))
-
-    # Extract real sender profile name from Meta payload
     contacts = change_val.get("contacts", [])
     sender_name = ""
     if contacts:
         sender_name = contacts[0].get("profile", {}).get("name", "").strip()
+
+    clean_phone = "".join(filter(str.isdigit, sender_phone))
+
+    # B4: Non-text messages (image, audio, sticker, document, etc.)
+    if msg_type != "text":
+        prompt_text = (
+            f"Namaste {sender_name or 'Partner'}! Humein aapka media sandesh mil gaya hai. "
+            "Kripya apni samasya (settlement, refund ya QR issue) text me type karke bhejein taaki hum turant madad kar sakein."
+        )
+        if clean_phone:
+            send_meta_whatsapp_message(clean_phone, prompt_text)
+        return {"status": "media_prompt_sent", "ticket_id": None, "reply": prompt_text}
+
+    sender_text = msg.get("text", {}).get("body", "").strip()
+    if not sender_text:
+        return {"status": "empty_body"}
+
+    text_lower = sender_text.lower().strip()
 
     conn = get_db()
     cur = conn.cursor()
@@ -879,15 +945,27 @@ async def receive_meta_whatsapp(request: Request, background_tasks: BackgroundTa
     conn.close()
 
     # 3. Execute autonomous Resolve OS policy pipeline synchronously (reliable on serverless)
+    policy_res = None
     try:
-        run_desk(ticket_id=ticket_id, request=None, recipient_phone=clean_phone)
+        policy_res = run_desk(ticket_id=ticket_id, request=None, recipient_phone=clean_phone)
     except Exception as e:
         print(f"[Resolve OS Webhook Execution Error] {ticket_id}: {e}")
+
+    final_status = policy_res.status if policy_res else "OPEN"
+    if final_status == "RESOLVED":
+        decision_label = "ACCEPTED"
+    elif final_status in ["ESCALATED", "CLOSED_REJECTED"]:
+        decision_label = "REJECTED"
+    elif final_status in ["WAITING", "WAITING_ON_MERCHANT"]:
+        decision_label = "ASK"
+    else:
+        decision_label = "OPEN"
 
     return {
         "status": "success",
         "ticket_id": ticket_id,
-        "decision": "ACCEPTED",
+        "decision": decision_label,
+        "ticket_status": final_status,
         "sender_phone": clean_phone
     }
 

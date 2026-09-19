@@ -225,7 +225,8 @@ def test_meta_whatsapp_deduplication():
 
 
 def test_meta_whatsapp_already_settled_no_risk_ops():
-    # Inquire about ₹14,280 which is already SUCCESS in seeded DB
+    # Set preset L-PAID (Settlement SUCCESS with UTR)
+    client.post("/api/demo/preset", json={"preset": "L-PAID", "merchant_id": "m_me"})
     payload = {
         "object": "whatsapp_business_account",
         "entry": [{

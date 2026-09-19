@@ -99,29 +99,17 @@ def seed_database(seed_hero_tickets: bool = True):
                 retry_count = EXCLUDED.retry_count
         """, (s["id"], s["merchant_id"], s.get("ticket_id"), s["amount"], s["status"], s.get("reason"), s.get("utr"), s.get("retry_count", 0), s_time))
 
-    # Standard test ledger rows for m_me:
-    # 1. Pending batch ₹12,000 INITIATED (for retry matching)
-    # 2. Completed batch ₹14,280 SUCCESS (for already-settled check)
+    # Standard test ledger row for m_me: L-OK (₹14,280 INITIATED, retries 0, clean ledger)
     cur.execute("""
         INSERT INTO settlements (id, merchant_id, ticket_id, amount, status, reason, utr, retry_count, created_at)
-        VALUES ('stl_me_01', 'm_me', NULL, 12000.0, 'INITIATED', 'BANK_FILE_PENDING', NULL, 0, ?)
+        VALUES ('stl_me_01', 'm_me', NULL, 14280.0, 'INITIATED', 'BANK_FILE_PENDING', NULL, 0, ?)
         ON CONFLICT (id) DO UPDATE SET
-            amount = 12000.0,
+            amount = 14280.0,
             status = 'INITIATED',
             reason = 'BANK_FILE_PENDING',
             utr = NULL,
             retry_count = 0
     """, (relative_iso(90),))
-    cur.execute("""
-        INSERT INTO settlements (id, merchant_id, ticket_id, amount, status, reason, utr, retry_count, created_at)
-        VALUES ('stl_me_02', 'm_me', NULL, 14280.0, 'SUCCESS', 'SETTLED_TO_BANK', 'PAYTM1928374650', 1, ?)
-        ON CONFLICT (id) DO UPDATE SET
-            amount = 14280.0,
-            status = 'SUCCESS',
-            reason = 'SETTLED_TO_BANK',
-            utr = 'PAYTM1928374650',
-            retry_count = 1
-    """, (relative_iso(240),))
 
     # 4. Seed transactions
     with open(DATA_DIR / "transactions.json", "r") as f:

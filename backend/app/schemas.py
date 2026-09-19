@@ -17,8 +17,8 @@ class PlanRead(BaseModel):
 class SarvamPlan(BaseModel):
     intent: str
     confidence: float = 0.9
-    summary_en: str
-    summary_hi: str
+    summary_en: str = ""
+    summary_hi: str = ""
     # Grok-suggested enrichments: Sarvam extracts these from Hinglish text
     # Policy never trusts these for money decisions — ledger state decides
     amount_mentioned: Optional[float] = None   # Rupee amount the merchant mentioned

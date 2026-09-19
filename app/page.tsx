@@ -134,18 +134,46 @@ function timeAgo(iso: string) {
 function getActorLabel(actor: string) {
   switch (actor?.toUpperCase()) {
     case "SARVAM":
-      return { label: "Sarvam", color: "bg-indigo-50 text-indigo-700 border-indigo-200" };
+    case "SARVAM_AI":
+      return { label: "Sarvam AI", color: "bg-indigo-50 text-indigo-700 border-indigo-200" };
     case "FIXTURE":
-      return { label: "Fixture planner", color: "bg-red-50 text-red-700 border-red-200" };
+      return { label: "Fixture fallback", color: "bg-amber-50 text-amber-700 border-amber-200" };
     case "COGNEE":
+    case "LEDGER_MEMORY":
       return { label: "Ledger memory", color: "bg-sky-50 text-sky-700 border-sky-200" };
     case "POLICY":
-      return { label: "Policy", color: "bg-emerald-50 text-emerald-700 border-emerald-200" };
-    case "N8N":
-    case "TOOL":
+    case "POLICY_ENGINE":
+      return { label: "Policy Engine", color: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+    case "OPERATOR":
+      return { label: "Human Operator", color: "bg-purple-50 text-purple-700 border-purple-200" };
     default:
-      return { label: "Backend", color: "bg-slate-50 text-slate-700 border-slate-200" };
+      return { label: actor || "System", color: "bg-slate-50 text-slate-700 border-slate-200" };
   }
+}
+
+function getPlainReason(code?: string): string {
+  if (!code) return "";
+  const map: Record<string, string> = {
+    SETTLEMENT_RETRY_OK: "Settlement retry initiated (< ₹50,000, clean ledger)",
+    SETTLEMENT_RETRY_DENIED_AMOUNT: "Exceeds ₹50k limit, escalated to Risk Ops",
+    SETTLEMENT_RETRY_DENIED_STATUS: "Non-retryable status, escalated to Risk Ops",
+    SETTLEMENT_RETRY_DENIED_RISK: "Max retries reached or compliance flag active",
+    SETTLEMENT_ALREADY_SUCCESS: "Already settled with verified bank UTR",
+    SETTLEMENT_NOT_FOUND: "No matching settlement found in ledger",
+    ASK_MERCHANT_UTR: "Multiple candidate payments, requested UTR from merchant",
+    REFUND_OK: "Refund approved for verified payment",
+    REFUND_DENIED_AMBIGUOUS: "Ambiguous refund details, requested clarification",
+    ESCALATE_RISK: "Account risk flag active, escalated to Risk Ops",
+    ESCALATE_QR_LOGISTICS: "QR standee damage escalated to Field Logistics",
+    ESCALATE_DEVICE_OFFLINE: "Device offline in registry, escalated to Field Ops",
+    ESCALATE_DEVICE_OPS: "Soundbox audio fault escalated to Device Ops",
+    ESCALATE_UNKNOWN_INTENT: "Clarification requested from merchant",
+    GREETING_ACK: "Merchant greeting acknowledged",
+    HUMAN_APPROVED: "Operator manual override approved",
+    HUMAN_REJECTED: "Operator manual override rejected",
+    ASK_CLARIFICATION: "Bare amount without issue context, asked for clarification",
+  };
+  return map[code] || code.replace(/_/g, " ").toLowerCase();
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -556,6 +584,25 @@ export default function ResolveOS() {
       }
     } catch {
       showToast("error", "Failed to reset merchant.");
+    }
+  };
+
+  const handleSelectPreset = async (presetId: string) => {
+    try {
+      const res = await fetch(getApiUrl("/api/demo/preset"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preset: presetId }),
+      });
+      if (res.ok) {
+        showToast("success", `Ledger preset applied: ${presetId}`);
+        if (selectedId) await fetchDetail(selectedId);
+        await Promise.all([fetchTickets(), fetchFallbackLedger()]);
+      } else {
+        showToast("error", "Failed to apply preset.");
+      }
+    } catch {
+      showToast("error", "Network error applying preset.");
     }
   };
 
@@ -1454,14 +1501,98 @@ export default function ResolveOS() {
             </div>
           )}
 
-          {/* Card 4: Audit Stream */}
+          {/* Card 2: Settlement Ledger (FIRST, ALWAYS) */}
           <div className="ros-card rounded-xl p-4 shadow-sm border border-slate-200/90 space-y-2.5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <span className="text-[10px] font-bold tracking-[0.08em] uppercase text-slate-500">
-                Audit Stream
+                Settlement Ledger
               </span>
-              <span className="text-[10px] text-[#002970] font-mono font-semibold px-1.5 py-0.2 rounded bg-[#002970]/5">
-                {events.length} events
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300 tracking-wider">
+                TEST DATA &middot; Live
+              </span>
+            </div>
+
+            {primarySettlement ? (
+              <div className="space-y-2 text-xs font-normal">
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">BATCH ID</span>
+                  <span className="font-mono text-slate-900 font-medium">{primarySettlement.id}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-100 items-center">
+                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">AMOUNT</span>
+                  <span className="text-sm font-bold text-[#002970] font-mono">
+                    {formatRupees(primarySettlement.amount)}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-100 items-center">
+                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">STATUS</span>
+                  <span
+                    className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold tracking-wide border ${
+                      primarySettlement.status === "SUCCESS"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                        : primarySettlement.status === "FAILED"
+                        ? "bg-rose-50 text-rose-700 border-rose-300"
+                        : "bg-amber-50 text-amber-700 border-amber-300"
+                    }`}
+                  >
+                    {primarySettlement.status}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-100 items-center">
+                  <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">RETRIES</span>
+                  <span className="font-mono text-slate-700">{primarySettlement.retry_count || 0}/2</span>
+                </div>
+                {primarySettlement.utr && (
+                  <div className="flex justify-between py-1 border-b border-slate-100 items-center">
+                    <span className="text-[#6B7280] uppercase text-[10px] font-medium tracking-[0.06em]">BANK UTR</span>
+                    <span className="font-mono text-emerald-700 font-semibold text-[11px]">{primarySettlement.utr}</span>
+                  </div>
+                )}
+                {activeMerchant?.risk_flag && (
+                  <div className="flex justify-between py-1 border-b border-slate-100 items-center">
+                    <span className="text-rose-600 uppercase text-[10px] font-bold tracking-[0.06em]">COMPLIANCE FLAG</span>
+                    <span className="font-mono text-rose-700 font-bold text-[11px]">{activeMerchant.risk_flag}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-slate-400 py-3 text-center text-xs">No active settlement on file</div>
+            )}
+          </div>
+
+          {/* Card 3: Paytm Device Registry */}
+          <div className="ros-card rounded-xl p-4 shadow-sm border border-slate-200/90 space-y-2.5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <span className="text-[10px] font-bold tracking-[0.08em] uppercase text-slate-500">
+                Device Registry
+              </span>
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200">
+                Hardware
+              </span>
+            </div>
+
+            <div className="space-y-1.5 text-xs">
+              <div className="flex justify-between py-0.5">
+                <span className="text-[#6B7280]">SOUNDBOX</span>
+                <span className={`font-medium ${activeMerchant?.soundbox_status === "ONLINE" ? "text-emerald-600" : "text-amber-600"}`}>
+                  {activeMerchant?.soundbox_status || "ONLINE"}
+                </span>
+              </div>
+              <div className="flex justify-between py-0.5">
+                <span className="text-[#6B7280]">QR STANDEE</span>
+                <span className="font-medium text-emerald-600">{activeMerchant?.qr_status || "LIVE"}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4: Audit Event Ledger (Real-time timeline) */}
+          <div className="ros-card rounded-xl p-4 shadow-sm border border-slate-200/90 space-y-2.5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <span className="text-[10px] font-bold tracking-[0.08em] uppercase text-slate-500">
+                Audit Timeline
+              </span>
+              <span className="text-[10px] font-mono text-slate-400">
+                {events.length} records
               </span>
             </div>
 
@@ -1470,11 +1601,11 @@ export default function ResolveOS() {
                 No events yet.
               </div>
             ) : (
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
                 {events.map((ev) => {
                   const actorMeta = getActorLabel(ev.actor);
                   return (
-                    <div key={ev.id} className="text-xs border-b border-slate-200/50 pb-1">
+                    <div key={ev.id} className="text-xs border-b border-slate-200/50 pb-2">
                       <div className="flex items-center justify-between gap-1">
                         <span className={`px-1.5 py-0.2 rounded text-[9px] font-medium border ${actorMeta.color}`}>
                           {actorMeta.label}
@@ -1483,14 +1614,17 @@ export default function ResolveOS() {
                           {ev.ts ? ev.ts.slice(11, 19) : ""}
                         </span>
                       </div>
-                      <div className="font-medium text-slate-800 text-[11px] mt-0.5">
-                        {ev.type}
-                        {ev.reason_code && (
-                          <span className="font-mono text-slate-500 font-normal ml-1">
-                            · {ev.reason_code}
-                          </span>
-                        )}
+                      <div className="font-medium text-slate-800 text-[11.5px] mt-1 flex items-center justify-between">
+                        <span>{ev.type}</span>
+                        {ev.latency_ms ? (
+                          <span className="text-[10px] text-slate-400 font-mono">{ev.latency_ms}ms</span>
+                        ) : null}
                       </div>
+                      {ev.reason_code && (
+                        <div className="text-[11px] text-slate-600 font-normal mt-0.5 leading-snug">
+                          {getPlainReason(ev.reason_code)}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -1506,14 +1640,41 @@ export default function ResolveOS() {
             >
               <span className="flex items-center gap-1.5">
                 <Sliders className="w-3.5 h-3.5 text-[#00BAF2]" />
-                Operator Demo Tools
+                Operator Demo Tools &amp; Presets
               </span>
               {demoToolsOpen ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
             </button>
 
             {demoToolsOpen && (
-              <div className="p-3.5 border-t border-slate-100 space-y-2.5 bg-slate-50/50">
-                <div className="flex gap-1.5 items-center">
+              <div className="p-3.5 border-t border-slate-100 space-y-3 bg-slate-50/50">
+                {/* Presets Grid */}
+                <div>
+                  <span className="text-[10px] font-bold tracking-[0.06em] text-slate-500 uppercase block mb-1.5">
+                    Ledger Presets
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { id: "L-OK", label: "L-OK (₹14.2k Valid)" },
+                      { id: "L-PAID", label: "L-PAID (Already Paid)" },
+                      { id: "L-BIG", label: "L-BIG (₹200k High)" },
+                      { id: "L-FROZEN", label: "L-FROZEN (Account)" },
+                      { id: "L-RISK", label: "L-RISK (AML Flag)" },
+                      { id: "L-REFUND-AMBIG", label: "L-REFUND (Ambig)" },
+                      { id: "L-REFUND-OK", label: "L-REFUND (1 Match)" },
+                    ].map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => handleSelectPreset(p.id)}
+                        className="h-7 px-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded text-[10.5px] font-medium truncate text-left transition shadow-2xs"
+                        title={p.id}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-1.5 items-center pt-1 border-t border-slate-200/60">
                   <input
                     type="number"
                     value={customAmount}
@@ -1525,7 +1686,7 @@ export default function ResolveOS() {
                     onClick={handleSetAmount}
                     className="h-7 px-3 bg-slate-800 hover:bg-slate-900 text-white rounded-[4px] text-xs font-medium transition"
                   >
-                    Set
+                    Set ₹
                   </button>
                 </div>
 
