@@ -145,7 +145,7 @@ def get_tickets():
     conn = get_db()
     cur = conn.cursor()
     cur.execute("""
-        SELECT t.*, m.name as merchant_name, m.city as merchant_city, m.category as merchant_category
+        SELECT t.*, m.name as merchant_name, m.phone as merchant_phone, m.city as merchant_city, m.category as merchant_category
         FROM tickets t
         JOIN merchants m ON t.merchant_id = m.id
         ORDER BY t.created_at DESC

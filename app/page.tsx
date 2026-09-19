@@ -22,6 +22,7 @@ import {
   SendHorizontal,
   ArrowRight,
   GripVertical,
+  Phone,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -30,6 +31,7 @@ interface Ticket {
   id: string;
   merchant_id: string;
   merchant_name: string;
+  merchant_phone?: string | null;
   merchant_city: string;
   merchant_category: string;
   text: string;
@@ -97,6 +99,26 @@ function formatRupees(amount: number | null | undefined) {
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+function formatPhone(phone: string | null | undefined): string {
+  if (!phone) return "";
+  const clean = phone.replace(/\D/g, "");
+  if (clean.length === 12 && clean.startsWith("91")) {
+    return `+91 ${clean.slice(2, 7)} ${clean.slice(7)}`;
+  }
+  if (clean.length === 10) {
+    return `+91 ${clean.slice(0, 5)} ${clean.slice(5)}`;
+  }
+  return phone.startsWith("+") ? phone : `+${phone}`;
+}
+
+function getTicketContact(ticket: Ticket): string {
+  if (ticket.merchant_phone) return formatPhone(ticket.merchant_phone);
+  if (ticket.merchant_id?.startsWith("m_91") || (ticket.merchant_id?.startsWith("m_") && /^\d+$/.test(ticket.merchant_id.slice(2)))) {
+    return formatPhone(ticket.merchant_id.slice(2));
+  }
+  return ticket.merchant_name || ticket.merchant_id;
 }
 
 function timeAgo(iso: string) {
@@ -277,7 +299,7 @@ export default function ResolveOS() {
           if (newWaTicket) {
             setSelectedId(newWaTicket.id);
             setActiveTab((prev) => (prev === "hero" ? "whatsapp" : prev));
-            showToast("info", `New WhatsApp message: ${newWaTicket.merchant_name || newWaTicket.id}`);
+            showToast("info", `New WhatsApp message: ${getTicketContact(newWaTicket)}`);
           }
           knownTicketIdsRef.current = new Set(data.map((t) => t.id));
         }
@@ -1025,8 +1047,15 @@ export default function ResolveOS() {
                     </div>
 
                     <div className="text-[13px] font-medium text-slate-800 truncate">
-                      {ticket.merchant_name} ·{" "}
-                      <span className="text-[#002970]">{formatRupees(ticket.amount)}</span>
+                      <span className="font-mono text-[12.5px] font-semibold text-slate-800 tracking-tight">
+                        {getTicketContact(ticket)}
+                      </span>
+                      {ticket.amount && Number(ticket.amount) > 0 ? (
+                        <>
+                          <span className="text-slate-400 font-sans font-normal mx-1">·</span>
+                          <span className="text-[#002970] font-sans font-semibold">{formatRupees(ticket.amount)}</span>
+                        </>
+                      ) : null}
                     </div>
 
                     <div className="text-xs font-normal text-slate-500 truncate">
@@ -1100,7 +1129,15 @@ export default function ResolveOS() {
                     </span>
                   </div>
                   <div className="text-xs font-normal text-slate-500 mt-1 flex items-center gap-1.5">
-                    <span className="font-medium text-slate-700">{detail?.merchant?.name || selectedTicket.merchant_name}</span>
+                    <span className="font-mono font-semibold text-slate-800">
+                      {detail?.merchant?.phone ? formatPhone(detail.merchant.phone) : (detail?.merchant?.name || selectedTicket.merchant_name)}
+                    </span>
+                    {detail?.merchant?.name && (
+                      <>
+                        <span>&middot;</span>
+                        <span className="font-medium text-slate-700">{detail.merchant.name}</span>
+                      </>
+                    )}
                     <span>&middot;</span>
                     <span>{detail?.merchant?.city || selectedTicket.merchant_city || "Delhi NCR"}</span>
                     <span>&middot;</span>
@@ -1163,11 +1200,16 @@ export default function ResolveOS() {
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-2">
                     <div className="size-5 rounded-[4px] bg-[#002970]/10 flex items-center justify-center text-[#002970] font-bold text-[10px]">
-                      {(detail?.merchant?.name || selectedTicket.merchant_name).charAt(0)}
+                      <Phone className="size-2.5" />
                     </div>
-                    <span className="text-xs font-semibold text-slate-800">
-                      {detail?.merchant?.name || selectedTicket.merchant_name}
+                    <span className="text-xs font-semibold font-mono text-slate-800">
+                      {detail?.merchant?.phone ? formatPhone(detail.merchant.phone) : (detail?.merchant?.name || selectedTicket.merchant_name)}
                     </span>
+                    {detail?.merchant?.name && (
+                      <span className="text-[11px] text-slate-500 font-sans font-normal">
+                        ({detail.merchant.name})
+                      </span>
+                    )}
                   </div>
                   <span className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
                     <span className="size-1.5 rounded-full bg-emerald-500" />
@@ -1287,7 +1329,7 @@ export default function ResolveOS() {
                   {/* Inbound WhatsApp Message */}
                   <div className="bg-white border border-slate-200/80 rounded-2xl rounded-tl-sm p-3.5 text-xs text-slate-800 shadow-sm space-y-1">
                     <div className="text-[10px] font-semibold text-[#002970] flex items-center justify-between">
-                      <span>{detail?.merchant?.name || selectedTicket.merchant_name} (Merchant)</span>
+                      <span className="font-mono">{detail?.merchant?.phone ? formatPhone(detail.merchant.phone) : (detail?.merchant?.name || selectedTicket.merchant_name)}</span>
                       <span className="text-slate-400 font-normal">{timeAgo(selectedTicket.created_at)}</span>
                     </div>
                     <div className="text-[13px] leading-relaxed text-slate-800">{selectedTicket.text}</div>

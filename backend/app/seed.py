@@ -38,8 +38,8 @@ def seed_database(seed_hero_tickets: bool = True):
     for m in merchants:
         cur.execute("""
             INSERT INTO merchants (id, phone, name, city, category, qr_status, soundbox_status, avg_gmv, preferred_lang, risk_flag, created_at)
-            VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (m["id"], m["name"], m["city"], m["category"], m["qr_status"], m["soundbox_status"], m["avg_gmv"], m["preferred_lang"], m.get("risk_flag"), now_iso()))
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (m["id"], m.get("phone"), m["name"], m["city"], m["category"], m["qr_status"], m["soundbox_status"], m["avg_gmv"], m["preferred_lang"], m.get("risk_flag"), now_iso()))
 
     # Primary merchant row for the WhatsApp number / sandbox
     cur.execute("""

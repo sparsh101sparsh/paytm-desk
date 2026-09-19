@@ -2,6 +2,7 @@
   {
     "id": "m_2041",
     "name": "Sharma Kirana",
+    "phone": "919810120410",
     "city": "Karol Bagh",
     "category": "Kirana",
     "qr_status": "LIVE",
@@ -13,6 +14,7 @@
   {
     "id": "m_2048",
     "name": "Glow Salon",
+    "phone": "919810120480",
     "city": "Lajpat Nagar",
     "category": "Salon",
     "qr_status": "LIVE",
@@ -24,6 +26,7 @@
   {
     "id": "m_2099",
     "name": "Delhi Electronics",
+    "phone": "919810120990",
     "city": "Nehru Place",
     "category": "Electronics",
     "qr_status": "LIVE",
@@ -35,6 +38,7 @@
   {
     "id": "m_2104",
     "name": "Gupta Sweets",
+    "phone": "919810121040",
     "city": "Chandni Chowk",
     "category": "Sweets & Snacks",
     "qr_status": "LIVE",
@@ -46,6 +50,7 @@
   {
     "id": "m_2115",
     "name": "Aggarwal Supermart",
+    "phone": "919810121150",
     "city": "Rohini",
     "category": "Supermarket",
     "qr_status": "LIVE",
