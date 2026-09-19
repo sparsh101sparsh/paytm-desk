@@ -35,6 +35,21 @@ import {
   AnalyticsView,
 } from "./components/views";
 
+// ─── Official WhatsApp Brand Icon ───────────────────────────────────────────────
+
+function WhatsAppIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M17.472 14.382c-.301-.15-1.78-.878-2.056-.978-.276-.1-.476-.15-.677.15-.2.301-.776.978-.952 1.179-.175.2-.351.226-.652.075-.301-.15-1.27-.468-2.42-1.493-.894-.798-1.498-1.784-1.674-2.085-.175-.301-.019-.464.132-.614.136-.135.301-.351.451-.527.15-.176.2-.301.3-.501.101-.201.051-.376-.025-.527-.075-.15-.677-1.632-.928-2.235-.244-.587-.492-.507-.677-.516-.175-.008-.376-.01-.577-.01-.201 0-.526.075-.802.376-.276.301-1.053 1.028-1.053 2.508 0 1.48 1.078 2.909 1.229 3.11.15.201 2.12 3.238 5.136 4.542.717.31 1.277.496 1.713.634.72.229 1.375.197 1.893.12.577-.087 1.78-.727 2.03-1.43.25-.702.25-1.304.175-1.43-.075-.125-.276-.2-.577-.35zM12.04 2C6.505 2 2.015 6.49 2.015 12.025c0 1.94.553 3.754 1.514 5.292L2 22l4.83-1.472a9.98 9.98 0 0 0 5.21 1.458h.004c5.534 0 10.024-4.49 10.024-10.025C22.068 6.49 17.574 2 12.04 2zm0 18.285h-.003a8.27 8.27 0 0 1-4.218-1.155l-.302-.18-3.136.956.963-3.056-.197-.313a8.27 8.27 0 0 1-1.27-4.512c0-4.57 3.718-8.287 8.29-8.287 2.215 0 4.297.863 5.862 2.43 1.566 1.566 2.428 3.649 2.427 5.864 0 4.57-3.718 8.289-8.293 8.289z" />
+    </svg>
+  );
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Ticket {
@@ -823,10 +838,10 @@ export default function ResolveOS() {
             href="https://wa.me/15552013457?text=Kal%20ka%2014000%20ka%20settlement%20nahi%20aaya"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 h-7 px-2 sm:px-2.5 rounded-[4px] bg-[#25D366] hover:bg-[#20bd5a] text-white font-medium shadow-sm transition border border-[#25D366]/40 group shrink-0"
+            className="flex items-center gap-1.5 h-7 px-2 sm:px-2.5 rounded-[4px] bg-[#25D366] hover:bg-[#20bd5a] text-white font-medium shadow-sm transition border border-[#25D366]/40 group shrink-0 cursor-pointer"
             title="Open Live WhatsApp Bot (+1 555 201-3457)"
           >
-            <MessageSquare className="w-3.5 h-3.5 fill-white text-white shrink-0" />
+            <WhatsAppIcon className="w-3.5 h-3.5 fill-white text-white shrink-0" />
             <span className="font-semibold text-[11px] sm:text-xs tracking-tight">WhatsApp Bot</span>
             <ExternalLink className="w-3 h-3 opacity-80 group-hover:opacity-100 transition shrink-0" />
           </a>
@@ -1032,7 +1047,7 @@ export default function ResolveOS() {
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#25D366] hover:bg-[#20bd5a] text-white text-[11px] font-semibold shadow-xs transition shrink-0 cursor-pointer"
               title="Open WhatsApp Bot (+1 555 201-3457)"
             >
-              <MessageSquare className="w-3 h-3 fill-white text-white" />
+              <WhatsAppIcon className="w-3 h-3 fill-white text-white shrink-0" />
               <span>WhatsApp Bot</span>
               <ExternalLink className="w-2.5 h-2.5" />
             </a>
