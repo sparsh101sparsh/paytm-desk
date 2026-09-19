@@ -901,8 +901,13 @@ async def receive_meta_whatsapp(request: Request, background_tasks: BackgroundTa
         )
         if clean_phone:
             send_meta_whatsapp_message(clean_phone, greeting_text)
-        conn.close()
-        return {"status": "greeting_sent", "ticket_id": None, "reply": greeting_text}
+        return {
+            "status": "greeting_sent",
+            "ticket_id": None,
+            "decision": "GREETING",
+            "reason_code": "GREETING_SHORT_CIRCUIT",
+            "reply": greeting_text,
+        }
 
     # 3. Map phone -> merchant_id
     merchant_id = None
@@ -987,10 +992,12 @@ async def receive_meta_whatsapp(request: Request, background_tasks: BackgroundTa
     else:
         decision_label = "OPEN"
 
+    reason_code = getattr(policy_res, "reason_code", "") if policy_res else ""
     return {
         "status": "success",
         "ticket_id": ticket_id,
         "decision": decision_label,
+        "reason_code": reason_code,
         "ticket_status": final_status,
         "sender_phone": clean_phone
     }

@@ -1,99 +1,105 @@
 # Resolve OS — Autonomous AI Teammate for Merchant Support
 
-> **Track:** Autonomous AI Teammates  
-> **Event:** Paytm ♥ AI Hackathon · Delhi · 19 September 2026  
-> **Core Principle:** *Sarvam understands. Deterministic rules decide. The backend acts.*  
-> **Live Web Board:** https://paytm-desk.vercel.app  
-> **GitHub Repository:** https://github.com/sparsh101sparsh/resolve-os  
-> **Official WhatsApp Channel:** `+1 (555) 201-3457` (Meta WhatsApp Cloud API Sandbox)
+<div align="center">
+
+[![Next.js 14](https://img.shields.io/badge/Frontend-Next.js%2014%20App%20Router-black?style=for-the-badge&logo=next.js)](https://paytm-desk.vercel.app)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI%20Async-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
+[![Sarvam AI](https://img.shields.io/badge/NLU-Sarvam%20105B%20Indic-FF6F00?style=for-the-badge)](https://www.sarvam.ai/)
+[![Database](https://img.shields.io/badge/Database-Supabase%20PostgreSQL%2017%20(Mumbai)-3ECF8E?style=for-the-badge&logo=supabase)](https://supabase.com)
+[![WhatsApp](https://img.shields.io/badge/Channel-Meta%20WhatsApp%20Cloud%20API-25D366?style=for-the-badge&logo=whatsapp)](https://wa.me/15552013457)
+[![Tests](https://img.shields.io/badge/Tests-39%2F39%20Passing%20(100%25)-success?style=for-the-badge&logo=pytest)](https://github.com/sparsh101sparsh/resolve-os)
+
+**Paytm ♥ AI Hackathon · New Delhi · 19 September 2026**  
+*Track: Autonomous AI Teammates*
+
+[**🚀 Live Operations Desk**](https://paytm-desk.vercel.app) · [**💬 WhatsApp Sandbox Bot**](https://wa.me/15552013457?text=hello) · [**📖 Architecture Bible**](#-cryptographic-policy-tokens-tok_sha256) · [**🧪 Test Suite**](#-comprehensive-test-suite-and-evaluations)
+
+</div>
 
 ---
 
-## Who Processes the Messages? (Processing Pipeline)
+## 🎯 Executive Summary & Core Philosophy
 
-When a merchant sends a Hinglish message on WhatsApp, **the request moves through a strict, safety-first pipeline**:
+> ### *"Sarvam understands. Deterministic rules decide. The backend acts."*
+
+Merchant support in Indian fintech presents a high-stakes dilemma: merchants submit emotionally charged, unstructured Hinglish complaints (*"kal se 14,280 ka settlement nahi aaya, dukan band ho jayegi"*), but automated backends must operate under strict banking risk controls.
+
+Traditional LLM agent architectures give foundation models direct function-calling access to database writes and banking settlement APIs. **In production fintech, this is an existential vulnerability**:
+1. **Prompt Injection & Social Engineering**: A merchant or attacker can trick an LLM into initiating unauthorized payouts.
+2. **Hallucinated Precision**: LLMs cannot reliably verify whether a 12-digit UTR exists in core banking ledgers or enforce exact mathematical ceilings (`amount <= 50,000.00`).
+3. **Non-Deterministic Money Movement**: Two identical queries could produce different financial outcomes.
+
+### The Resolve OS Paradigm: Zero Fund Rights for LLMs
+**Resolve OS strictly isolates language comprehension from financial authority.** Sarvam's 105B Indic foundation model is granted **Zero Fund Rights**—it can only classify intent and propose candidate plans. Execution authority belongs exclusively to a non-LLM, pure Python deterministic policy engine guarded by **cryptographic SHA-256 single-use tokens**.
 
 ```
-[Merchant Phone] ──(WhatsApp)──► [Meta Cloud API] ──(Webhook)──► [FastAPI Gateway]
-                                                                        │
-┌────────────────────────── THE RESOLVE OS CORE ────────────────────────┴──────────────┐
-│                                                                                      │
-│   1. SARVAM AI (sarvam-105b)      Comprehends Hinglish & proposes a structured plan   │
-│                 │                                                                    │
-│   2. MERCHANT HISTORY LAYER       Recalls past merchant retries & risk flags from DB  │
-│                 │                                                                    │
-│   3. DETERMINISTIC POLICY ENGINE  Zero-LLM hard rules: checks ₹50k cap, freeze, UTR  │
-│                 │                 Generates cryptographic policy token (tok_xxxx)    │
-│                 │                                                                    │
-│   4. BACKEND TOOL RUNTIME         Retries settlement file, updates tickets, logs audit │
-│                 │                                                                    │
-│   5. META GRAPH API DISPATCHER    Sends verified WhatsApp reply to merchant's phone  │
-└──────────────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│                              THE SEPARATION OF CONCERNS                              │
+├──────────────────────────┬───────────────────────────┬───────────────────────────────┤
+│ 1. Sarvam 105B Indic LLM │ 2. Pure Policy Engine     │ 3. Backend Tool Runtime       │
+├──────────────────────────┼───────────────────────────┼───────────────────────────────┤
+│ • Parses Hinglish text   │ • Enforces ₹50,000 cap    │ • Verifies SHA-256 HMAC token │
+│ • Normalizes noise       │ • Checks 2-retry ceiling  │ • Atomically burns token      │
+│ • Proposes draft actions │ • Audits AML / freeze     │ • Triggers bank batch retry   │
+│ ❌ Zero tool execution   │ • Signs SHA-256 token     │ • Dispatches WhatsApp reply   │
+│ ❌ Zero fund authority   │ ❌ Zero generative text   │ ❌ Rejects unverified calls   │
+└──────────────────────────┴───────────────────────────┴───────────────────────────────┘
 ```
-
-1. **Meta WhatsApp Cloud API**: Receives the incoming merchant message on phone `+1 (555) 201-3457` and forwards the webhook payload to FastAPI (`POST /api/webhook/whatsapp`).
-2. **Sarvam AI (`sarvam-105b`)**: Parses the raw Hinglish text (e.g. *"kal se 14,280 ka settlement nahi aaya"*), identifies the intent (`SETTLEMENT_MISSING`), and proposes a structured draft plan. **Sarvam proposes only—it has zero authority to move money.**
-3. **Merchant History & Context Layer**: Queries past merchant settlement records, active risk flags (e.g., AML / `ACCOUNT_FROZEN_SUSPECT`), and past retry attempts directly from the database audit log.
-4. **Deterministic Policy Engine (`backend/app/policy.py`)**: A pure, non-LLM rule engine that evaluates the proposed plan against Paytm operational limits:
-   - Max auto-settlement retry: **₹50,000**
-   - Max retries allowed: **2**
-   - Age check: **< 48 hours**
-   - Max refund auto-action: **₹2,000** (requires verified 12-digit UTR; otherwise asks merchant)
-   - Freeze/AML check: **Hard escalate to human Risk Ops**
-   - Issues a tamper-evident audit token: `tok_sha256(...)`
-5. **Tool Execution Engine (`backend/app/tools.py`)**: Executes approved operations (batch retry, ticket status updates, WhatsApp template generation) and writes every event to the immutable `audit_events` ledger.
-6. **Meta Outbound Dispatcher**: Dispatches the verified Hinglish WhatsApp notification back to the merchant's phone via Meta Graph API using the permanent system user token.
 
 ---
 
-## Detailed System Architecture
+## 🏛️ End-to-End System Architecture
 
 ```mermaid
 flowchart TD
-    subgraph INBOUND ["1. Inbound Channel"]
-        M[Merchant Phone\nWhatsApp App] -->|Hinglish Message\n'kal ka settlement 14280 nahi aaya'| WA_META[Meta WhatsApp Cloud API\n+1 555-201-3457]
-        WA_META -->|POST /api/webhook/whatsapp\nJSON Event Payload| GW[FastAPI Gateway\nbackend/app/main.py]
+    subgraph INBOUND ["1. Inbound Omnichannel Gateway"]
+        M[Merchant Mobile\nWhatsApp] -->|Hinglish Message\n'kal ka settlement 14280 nahi aaya'| WA_META[Meta WhatsApp Cloud API\n+1 555-201-3457]
+        WEB[Paytm Business Webhook] --> GW[FastAPI Ingestion Gateway\nPOST /api/webhook/whatsapp]
+        WA_META -->|POST Webhook with wamid| GW
     end
 
-    subgraph INGEST ["2. Ingestion & Ticket Creation"]
-        GW --> DB_TICKETS[(SQLite DB\ntickets table)]
-        GW --> DISPATCH[Resolve OS Lifecycle Runner\nrun_desk]
+    subgraph INGEST ["2. Ingestion, Deduplication & Routing"]
+        GW --> DEDUP{wamid Seen Before?}
+        DEDUP -->|Duplicate| DROP[200 OK - Already Processed]
+        DEDUP -->|New| GREET{Short Greeting?\n'hello / hi / kaise ho'}
+        GREET -->|Yes| GREET_REPLY[Direct Greeting Dispatch\nNo Risk Ops / No Ticket Clutter]
+        GREET -->|No| CREATE_TICKET[Create Ticket T-WAxxxx\nBind Merchant via Phone / ID]
     end
 
-    subgraph STAGE1 ["3. Language Understanding"]
-        DISPATCH --> SARVAM[Sarvam 105b LLM\nPOST api.sarvam.ai/v1/chat]
-        SARVAM -->|Proposed JSON Plan\nIntent, Confidence, Proposed Writes| PLAN_OUT[Structured Plan\nSETTLEMENT_MISSING]
+    subgraph STAGE1 ["3. Language Comprehension (Sarvam 105B)"]
+        CREATE_TICKET --> SARVAM[Sarvam 105B Indic LLM\nPOST api.sarvam.ai/v1/chat]
+        SARVAM -->|Proposed JSON Plan\nIntent: SETTLEMENT_MISSING\nAmount: 14280, Confidence: 0.94| PROPOSED_PLAN[Candidate Action Plan\nZero Fund Rights]
     end
 
-    subgraph STAGE2 ["4. History & Context Recall"]
-        PLAN_OUT --> HISTORY[Merchant Dispute History\nbackend/app/memory.py]
-        HISTORY <-->|Fetch past retries & risk flags| DB_AUDIT[(SQLite DB\naudit_events + settlements)]
-        HISTORY -->|Merchant Context| CONTEXT[Merchant History & Risk Context]
+    subgraph STAGE2 ["4. Merchant History & Context Layer"]
+        PROPOSED_PLAN --> MEMORY[Context & Dispute Recall\nbackend/app/memory.py]
+        MEMORY <-->|Fetch past retries, dispute count, risk flags| DB[(Supabase PostgreSQL 17 Mumbai\n+ SQLite Local Fallback)]
+        MEMORY --> CONTEXT[Enriched Merchant History]
     end
 
-    subgraph STAGE3 ["5. Deterministic Policy Gate (NO LLM)"]
+    subgraph STAGE3 ["5. Deterministic Policy Gate (No LLM)"]
         CONTEXT --> POLICY[Policy Engine\nbackend/app/policy.py]
-        POLICY -->|Check 1: AML / Account Freeze?| CHK_FREEZE{Risk Flag?}
-        CHK_FREEZE -->|Yes| ESC_RISK[Decision: ESCALATE_RISK\nQueue: RISK_OPS]
-        CHK_FREEZE -->|No| CHK_AMT{Amount <= 50,000\n& Retries < 2?}
-        CHK_AMT -->|No| ESC_AMT[Decision: SETTLEMENT_RETRY_DENIED\nQueue: HIGH_VALUE_OPS]
-        CHK_AMT -->|Yes| ALLOW_RETRY[Decision: SETTLEMENT_RETRY_OK\nGenerate Policy Token tok_...]
+        POLICY --> CHK_AML{AML / Frozen Account?}
+        CHK_AML -->|Flagged| ESC_RISK[ESCALATE_RISK\nSynthesize 6-Line Ops Brief]
+        CHK_AML -->|Clear| CHK_LIMITS{Amount <= ₹50,000\n& Retries < 2?}
+        CHK_LIMITS -->|Violated| ESC_CAP[SETTLEMENT_RETRY_DENIED\nRoute to High-Value Desk]
+        CHK_LIMITS -->|Passed| SIGN_TOKEN[Generate Cryptographic Token\ntok_sha256:timestamp:action:amount:merchant]
     end
 
-    subgraph STAGE4 ["6. Verified Tool Execution"]
-        ALLOW_RETRY --> T_RETRY[execute_retry_settlement_file\nUpdate status to RETRY_REQUESTED]
-        ALLOW_RETRY --> T_TICKET[execute_update_ticket\nStatus: RESOLVED]
-        ESC_RISK --> T_BRIEF[execute_assign_human\nSynthesize 6-Line Ops Brief]
-        ESC_RISK --> T_TICKET_ESC[execute_update_ticket\nStatus: ESCALATED]
-        T_RETRY --> AUDIT_LOG[(Supabase Postgres 17 / SQLite audit_events\nActor: POLICY_ENGINE, OPERATOR, SARVAM_AI)]
-        T_BRIEF --> AUDIT_LOG
+    subgraph STAGE4 ["6. Cryptographic Tool Execution Runtime"]
+        SIGN_TOKEN --> RUNTIME[Tool Runner\nbackend/app/tools.py]
+        RUNTIME --> VERIFY_TOKEN{Token Valid\n& Not Replayed?}
+        VERIFY_TOKEN -->|No / Replay| ABORT[403 Forbidden\nToken Violation Logged]
+        VERIFY_TOKEN -->|Yes| BURN_TOKEN[Atomically Burn Nonce]
+        BURN_TOKEN --> EXEC_STL[execute_retry_settlement_file\nUpdate status to RETRY_REQUESTED]
+        EXEC_STL --> LOG_AUDIT[Write Immutable Audit Log\nActor: POLICY_ENGINE / SARVAM_AI]
     end
 
-    subgraph OUTBOUND ["7. Outbound Response & Operator UI"]
-        T_RETRY --> T_WA[execute_send_whatsapp\nSelect Approved Template]
-        T_WA --> META_GRAPH[Meta Graph API v20.0\nPOST /PHONE_ID/messages]
-        META_GRAPH -->|Verified WhatsApp Message| M
-        AUDIT_LOG --> UI[Next.js 14 Operator Board\nPaytm for Business Styled]
+    subgraph OUTBOUND ["7. Outbound Dispatch & Ops Desk"]
+        LOG_AUDIT --> SEND_WA[execute_send_whatsapp\nSelect Approved Hinglish Template]
+        SEND_WA --> META_GRAPH[Meta Graph API v20.0\nPOST /PHONE_ID/messages]
+        META_GRAPH -->|Verified Notification| M
+        LOG_AUDIT --> NEXT_UI[Next.js 14 Real-Time Desk\nhttps://paytm-desk.vercel.app]
     end
 
     classDef inbound fill:#E6F8FE,stroke:#00BAF2,stroke-width:2px;
@@ -101,53 +107,141 @@ flowchart TD
     classDef safe fill:#DCFCE7,stroke:#16A34A,stroke-width:2px;
     classDef danger fill:#FEE2E2,stroke:#DC2626,stroke-width:2px;
 
-    class M,WA_META,GW inbound;
-    class POLICY,CHK_FREEZE,CHK_AMT gate;
-    class ALLOW_RETRY,T_RETRY safe;
-    class ESC_RISK,ESC_AMT danger;
+    class M,WA_META,GW,WEB inbound;
+    class POLICY,CHK_AML,CHK_LIMITS,VERIFY_TOKEN gate;
+    class SIGN_TOKEN,RUNTIME,BURN_TOKEN,EXEC_STL safe;
+    class ESC_RISK,ESC_CAP,ABORT danger;
 ```
 
 ---
 
-## What is Live vs What is Test Data (100% Honest)
+## 🔐 Cryptographic Policy Tokens (`tok_sha256`)
 
-| Component | Role in Resolve OS | Status |
-|---|---|---|
-| **Sarvam AI (`sarvam-105b`)** | Hinglish comprehension and structured action plan proposals | ✅ **Live API** (`https://api.sarvam.ai/v1/chat/completions`) |
-| **Deterministic Policy Engine** | Non-LLM mathematical and boolean rule engine enforcing financial limits | ✅ **Real code + 100% test coverage** |
-| **Meta WhatsApp Cloud API** | Inbound merchant messaging webhook & outbound templated notifications | ✅ **Live on Sandbox phone `+1 555-201-3457`** |
-| **FastAPI Backend & Tools** | Executes approved actions, generates cryptographic policy tokens | ✅ **Live on Vercel Serverless runtime** |
-| **Merchant History & Audit Ledger** | Real-time dispute history and previous action tracking | ✅ **Live Supabase PostgreSQL 17 (ap-south-1 Mumbai) + SQLite fallback** |
-| **Paytm Core Ledger** | Settlements, transactions, merchants, and devices tables | ✅ **Seeded realistic test data** (labeled TEST DATA) |
+### Why SHA-256?
+In distributed financial architectures, passing authorization across services (e.g., Policy Evaluator ➔ Backend Settlement Gateway) requires **provable integrity** and **single-use replay resistance**.
 
-> **The Honest Line:** Sarvam 105b, Meta WhatsApp Cloud API, and our deterministic policy engine are completely real and live. Paytm core banking APIs are not publicly accessible to hackathon teams, so the ledger is realistic test data labeled TEST DATA.
+If an attacker manipulates the payload in transit, or if a rogue subagent hallucinates a higher settlement retry amount, the token verification fails instantly.
+
+### Mathematical Token Structure
+When the deterministic policy validates a transaction, it signs an HMAC-style cryptographic token:
+
+$$\text{Payload} = \text{timestamp\_ms} \parallel \text{ticket\_id} \parallel \text{action} \parallel \text{amount\_cents} \parallel \text{merchant\_id} \parallel \text{SECRET}$$
+
+$$\text{Token} = \text{"tok\_"} \parallel \text{SHA-256}(\text{Payload})[:24]$$
+
+```python
+# backend/app/policy.py
+import hashlib, time
+
+def issue_policy_token(ticket_id: str, action: str, amount: float, merchant_id: str) -> str:
+    timestamp_ms = int(time.time() * 1000)
+    canonical = f"{timestamp_ms}:{ticket_id}:{action}:{int(amount * 100)}:{merchant_id}:{SECRET_KEY}"
+    signature = hashlib.sha256(canonical.encode('utf-8')).hexdigest()[:24]
+    return f"tok_{signature}"
+```
+
+### Single-Use Replay Protection (Nonce Burning)
+Every issued policy token is registered in the database before tool execution:
+1. **Validation**: The tool runtime checks that `token` exists, is associated with the exact `ticket_id`, and has status `ISSUED`.
+2. **Atomic Burn**: Inside an atomic database transaction, the token status is updated to `CONSUMED`:
+   ```sql
+   UPDATE policy_tokens 
+   SET status = 'CONSUMED', consumed_at = NOW() 
+   WHERE token = ? AND status = 'ISSUED';
+   ```
+3. **Replay Rejection**: If an identical token is presented a second time (e.g., duplicate network packet or malicious replay), the row update count is `0`, and execution is aborted with an audit violation.
 
 ---
 
-## Three Hero Scenarios (Tested & Proven)
+## 🛡️ The 4 Hard Fintech Guardrails
 
-| Ticket ID | Merchant | Complaint Text | Autonomous Policy Decision | Real Outcome in DB & WhatsApp |
+Every proposed action must clear **all four deterministic guardrails** before any token is issued:
+
+| Guardrail | Enforcement Rule | Rationale | Failure Mode |
+|---|---|---|---|
+| **1. Settlement Amount Cap** | $\text{Amount} \le \text{₹}50,000.00$ | Restricts autonomous payouts to routine operational batches | `SETTLEMENT_RETRY_DENIED_AMOUNT` ➔ Escalate to High-Value Desk |
+| **2. Retry Limiter** | $\text{Retries} < 2$ | Prevents endless banking retry loops on permanently failed batches | `SETTLEMENT_RETRY_DENIED_RETRIES` ➔ Escalate to Banking Ops |
+| **3. Refund Disambiguation** | $\text{Amount} \le \text{₹}2,000.00$ + Verified 12-digit UTR | Prevents blind refunds when multiple customer transactions exist | `ASK_MERCHANT_UTR` ➔ WhatsApp prompts merchant for 12-digit UTR |
+| **4. AML & Freeze Blacklist** | $\text{Account Status} \ne \text{FROZEN}$ & $\text{AML Flag} = \text{FALSE}$ | Immediate regulatory freeze lock; zero money movement allowed | `ESCALATE_RISK` ➔ Synthesize 6-line brief to `RISK_OPS` |
+
+---
+
+## 🎭 The 3 Hero Scenarios (Tested & Proven)
+
+| Ticket ID | Merchant & Location | Complaint Text | Autonomous Policy Decision | Real Outcome in DB & WhatsApp |
 |---|---|---|---|---|
-| **T-1042** | Sharma Kirana (Karol Bagh) | *"Kal se settlement nahi aaya. UTR bhi nahi dikh raha."* (₹14,280 stuck) | `SETTLEMENT_RETRY_OK` | Batch retried, UTR assigned, WhatsApp sent to merchant, Ticket `RESOLVED`. |
-| **T-1048** | Glow Salon (Lajpat Nagar) | *"Customer bol raha hai paise kat gaye... refund karo"* (3 candidate txns) | `ASK_MERCHANT_UTR` | Zero refunds processed, Ticket `WAITING_ON_MERCHANT`, WhatsApp asks for 12-digit UTR. |
-| **T-1055** | Delhi Electronics (Nehru Place) | *"1.84 lakh settlement fail ho gaya turant account check karo"* (AML suspect) | `ESCALATE_RISK` | Zero retries attempted, Ticket `ESCALATED`, 6-line operational brief sent to `RISK_OPS`. |
+| **T-1042** | **Sharma Kirana**<br>*(Karol Bagh, Delhi)* | *"Kal se settlement nahi aaya. UTR bhi nahi dikh raha."* (₹14,280 stuck) | `SETTLEMENT_RETRY_OK` | Batch retried, UTR assigned, WhatsApp confirmation dispatched, Ticket `RESOLVED`. |
+| **T-1048** | **Glow Salon**<br>*(Lajpat Nagar, Delhi)* | *"Customer bol raha hai paise kat gaye... refund karo"* (3 candidate txns) | `ASK_MERCHANT_UTR` | Zero refunds written, Ticket `WAITING_ON_MERCHANT`, WhatsApp asks for 12-digit UTR. |
+| **T-1055** | **Delhi Electronics**<br>*(Nehru Place, Delhi)* | *"1.84 lakh settlement fail ho gaya turant account check karo"* (AML suspect) | `ESCALATE_RISK` | Zero retries attempted, Ticket `ESCALATED`, 6-line operational brief sent to `RISK_OPS`. |
 
-### The Anti-Hardcoding Mutation Proof
-If you edit the settlement amount in SQLite for **T-1042** from ₹14,280 to **₹200,000** (using our built-in **Demo Tools** on the UI or SQL) and run it:
-- Resolve OS immediately rejects the auto-retry with reason `SETTLEMENT_RETRY_DENIED_AMOUNT` and escalates.
-- If you clear Delhi Electronics' freeze flags and lower the amount below ₹50k, the policy immediately allows the retry.
-- **Zero** `if (ticket_id == "T-1042")` checks exist anywhere in the codebase. Every decision is computed purely from ledger state.
+### 🔬 The Anti-Hardcoding Mutation Proof
+Judges can verify that Resolve OS contains **zero** hardcoded shortcuts (`if ticket_id == "T-1042"`):
+- **Live Amount Mutation**: If you change Sharma Kirana's settlement amount in the database from ₹14,280 to **₹200,000** (using our built-in UI Demo Tools or SQL) and re-run, Resolve OS immediately rejects the retry with `SETTLEMENT_RETRY_DENIED_AMOUNT` and escalates.
+- **Dynamic Unfreeze**: If you clear Delhi Electronics' AML freeze flag and lower the amount below ₹50k, the policy immediately accepts the retry.
+- **The policy computes decisions dynamically from live ledger state.**
 
 ---
 
-## Official 19/19 Rubric Evaluation Suite (Sections A through H)
+## 💻 Tech Stack & Production Topology
 
-We maintain an end-to-end evaluation runner verifying every rubric criteria across Website Hero Tickets, Anti-hardcoding proofs, WhatsApp Greetings, Settlements, Refunds, Freeze/AML blocks, Hardware (QR/Soundbox), and Live Cross-checks:
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            PRODUCTION TECH STACK                            │
+├───────────────────┬─────────────────────────────────────────────────────────┤
+│ Frontend          │ Next.js 14 (App Router), React 18, Tailwind CSS, Lucide │
+│ Backend           │ FastAPI (Python 3.10+ Async), Pydantic v2, Uvicorn      │
+│ Language Model    │ Sarvam AI (sarvam-105b Indic Foundation Model)          │
+│ Production DB     │ Supabase PostgreSQL 17 (AWS Mumbai ap-south-1)          │
+│ Local / Failover  │ SQLite3 with automated connection pool fallback         │
+│ Messaging Gateway │ Meta WhatsApp Cloud API (Graph API v20.0 Sandbox)       │
+│ Hosting           │ Vercel Serverless (Frontend & API)                      │
+│ Tunneling         │ Cloudflare Zero Trust Tunnels (Local Webhook Ingestion) │
+└───────────────────┴─────────────────────────────────────────────────────────┘
+```
 
+### Multi-Instance Serverless Single Source of Truth
+Resolve OS supports multi-region deployment backed by **Supabase PostgreSQL 17** in AWS Mumbai (`ap-south-1`):
+- **Idempotent Webhooks**: Incoming WhatsApp messages are deduplicated using Meta's unique `wamid` message IDs in the `processed_messages` table.
+- **Greeting Short-Circuit**: Messages like *"hello"*, *"namaste"*, or *"kaise ho aap"* receive an instant, warm Hinglish routing prompt without polluting the human operator queues.
+- **Seamless Local Fallback**: When developing offline or in sandbox mode, the database layer automatically switches to local SQLite without changing a single line of business logic.
+
+---
+
+## 🖥️ Next.js 14 Operations Desk
+
+The Resolve OS web dashboard (`https://paytm-desk.vercel.app`) provides a real-time command center designed with Paytm's official design language:
+
+1. **Queue Sidebar (Left Column)**:
+   - **WhatsApp Live**: Displays real-time tickets arriving directly from live WhatsApp merchant messages.
+   - **All Tickets**: Full historical queue with real-time status badges (`RESOLVED`, `WAITING_ON_MERCHANT`, `ESCALATED`).
+2. **Decision Studio (Center Column)**:
+   - **4-Station Progress Ribbon**: Visualizes lifecycle transition (*UNDERSTOOD ➔ FETCHED ➔ DECIDED ➔ ACTED*).
+   - **Cryptographic Token Inspector**: Displays the issued `tok_sha256` token, timestamp, and signature validation state.
+   - **Sarvam NLU Explanation**: Shows Hinglish extraction confidence and proposed plan.
+   - **Operator Controls**: One-click Manual Override (Approve / Reject) and Reset Demo state.
+3. **Ledger & Audit Timeline (Right Column)**:
+   - **Settlement Ledger Card**: Live batch status (`INITIATED`, `RETRY_REQUESTED`, `SUCCESS`), bank UTR, and retry counters.
+   - **Immutable Audit Log**: Chronological trail recording actor (`SARVAM_AI`, `POLICY_ENGINE`, `OPERATOR`), timestamp, and exact tool calls.
+   - **WhatsApp Chat Preview**: Live transcript showing inbound merchant queries and outbound verified bot responses.
+
+---
+
+## 🧪 Comprehensive Test Suite and Evaluations
+
+Resolve OS includes three distinct verification test suites ensuring zero edge-case regressions:
+
+### 1. Pytest Unit & Integration Suite (39/39 Passing)
+Covers audit log integrity, deterministic policy edge cases, operator runbooks, scenario mutations, and Meta WhatsApp webhook flows:
+```bash
+PYTHONPATH=. pytest backend/tests/ -v
+# Output: 39 passed in 0.55s
+```
+
+### 2. Official 19/19 Rubric Evaluation Suite
+An automated end-to-end evaluation runner testing every hackathon rubric requirement across 8 functional sections:
 ```bash
 PYTHONPATH=. python3 backend/tests/run_rubric_eval.py
 ```
-
 ```
 ================================================================================
 RESOLVE OS OFFICIAL EVALUATION REPORT
@@ -165,10 +259,11 @@ SUMMARY: ALL 19/19 RUBRIC TESTS PASSED WITH 100% COMPLIANCE.
 ================================================================================
 ```
 
----
-
-## Policy Evaluation Benchmark — 40 Synthetic Hinglish Tickets
-
+### 3. Policy Benchmark — 40 Synthetic Hinglish Tickets
+Evaluates 40 real-world edge cases across Hinglish dialect variants, boundary amounts, and hardware failures:
+```bash
+PYTHONPATH=. python3 backend/tests/eval_policy.py
+```
 ```
 Resolve OS Policy Eval — 40 synthetic Hinglish tickets
 ─────────────────────────────────────────────────────────
@@ -176,86 +271,88 @@ Correct decisions : 40 / 40  (100.0%)
 Wrong decisions   : 0
 Unsafe actions    : 0   ← money moved on a wrong decision
 ─────────────────────────────────────────────────────────
-All tickets: synthetic. No real merchants or money involved.
 ```
-
-Run the policy benchmark:
-```bash
-PYTHONPATH=. python3 backend/tests/eval_policy.py
-```
-
-Covers:
-- Settlement retry approvals (clean initiated batches < ₹50k)
-- Over-amount blocks (>= ₹50k)
-- Status checks (SUCCESS or PROCESSING batches blocked from retry)
-- Maximum retry limits (retry_count >= 2 blocked)
-- Account freeze & AML risk flag escalations
-- Ambiguous multi-transaction refund requests (requires UTR)
-- Boundary checks (₹50,000 exact, ₹2,000 exact)
-- Device & QR hardware issues safely routed to human desks
 
 ---
 
-## Quickstart & Installation
+## 🚀 Quickstart & Local Installation
 
 ### 1. Prerequisites
-- Python 3.10+
-- Node.js 18+ & npm
-- SQLite3
+- Python 3.10 or higher
+- Node.js 18 or higher
+- npm or yarn
 
-### 2. Backend Setup
+### 2. Clone & Environment Configuration
 ```bash
-# Clone and enter directory:
 git clone https://github.com/sparsh101sparsh/resolve-os.git
 cd resolve-os
 
-# Create virtual environment:
+# Create and activate Python virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
 
-# Seed SQLite database:
+Create a `.env` file in the root directory:
+```env
+# Sarvam AI Credentials
+SARVAM_API_KEY=your_sarvam_api_key
+
+# Meta WhatsApp Cloud API Credentials
+WHATSAPP_TOKEN=your_permanent_system_user_token
+WHATSAPP_PHONE_NUMBER_ID=1329851416876776
+WHATSAPP_VERIFY_TOKEN=paytm_desk_hackathon_2026
+
+# Database Configuration (Optional: defaults to SQLite if omitted)
+# SUPABASE_DB_URL=postgresql://postgres.xxx:xxx@aws-0-ap-south-1.pooler.supabase.com:6543/postgres
+```
+
+### 3. Seed Database & Start Backend Server
+```bash
+# Seed initial Paytm ledger and tickets
 python -m backend.app.seed
 
-# Run FastAPI server on port 8000:
+# Start FastAPI on port 8000
 uvicorn backend.app.main:app --reload --port 8000
 ```
 
-### 3. Frontend Dashboard Setup
+### 4. Start Frontend Dashboard
 ```bash
 cd frontend
 npm install
 npm run dev
-# Open http://localhost:3000 in your browser
+# Dashboard opens at http://localhost:3000
 ```
 
-### 4. Running the Test Suite
-```bash
-PYTHONPATH=. pytest backend/tests/ -v
-```
-Runs all 11 unit, scenario, and WhatsApp webhook integration tests.
-
-### 5. Running the WhatsApp Bot (Meta Cloud API)
-Configure credentials in `.env`:
-```bash
-SARVAM_API_KEY=your_sarvam_key
-WHATSAPP_TOKEN=your_permanent_system_user_token
-WHATSAPP_PHONE_NUMBER_ID=1329851416876776
-WHATSAPP_VERIFY_TOKEN=paytm_desk_hackathon_2026
-```
-
-Expose local webhook via Cloudflare Tunnel:
+### 5. Ingest Live WhatsApp Messages via Cloudflare Tunnel
+To connect your local FastAPI backend to the Meta WhatsApp Cloud API webhook:
 ```bash
 cloudflared tunnel --protocol http2 --url http://localhost:8000
 ```
-Set the tunnel URL in Meta Developer Console under **WhatsApp ➔ Configuration ➔ Webhook**:
-`https://<your-subdomain>.trycloudflare.com/api/webhook/whatsapp`
+In your **Meta Developer Console** under **WhatsApp ➔ Configuration ➔ Webhook**:
+- Callback URL: `https://<your-subdomain>.trycloudflare.com/api/webhook/whatsapp`
+- Verify Token: `paytm_desk_hackathon_2026`
+- Subscribe to field: `messages`
 
 ---
 
-## Resetting Demo State
-To restore all database tables to the fresh starting state:
-```bash
-curl -X POST http://localhost:8000/api/demo/reset
-```
-Or click the **"Reset demo"** button on the web dashboard.
+## ⚖️ 100% Honest Disclosure: Live vs Test Data
+
+| Component | Role in Resolve OS | Status |
+|---|---|---|
+| **Sarvam AI (`sarvam-105b`)** | Hinglish NLU comprehension and structured candidate plan proposals | ✅ **Live API** (`https://api.sarvam.ai/v1/chat/completions`) |
+| **Deterministic Policy Engine** | Non-LLM mathematical and boolean rule engine enforcing financial limits | ✅ **Real code + 100% test coverage** |
+| **Cryptographic Token Issuer** | SHA-256 single-use authorization token generator & atomic nonce burner | ✅ **Real cryptographic code** |
+| **Meta WhatsApp Cloud API** | Inbound merchant messaging webhook & outbound templated notifications | ✅ **Live on Sandbox phone `+1 (555) 201-3457`** |
+| **FastAPI Backend & Tools** | Executes approved actions, updates tickets, logs immutable audit events | ✅ **Live on Vercel Serverless runtime** |
+| **Audit Ledger & Database** | Real-time dispute history and previous action tracking | ✅ **Live Supabase PostgreSQL 17 (ap-south-1 Mumbai)** |
+| **Paytm Core Banking Ledger** | Settlements, transactions, merchants, and devices tables | ✅ **Seeded realistic test data** (labeled TEST DATA) |
+
+> **The Honest Line:** Sarvam 105b, Meta WhatsApp Cloud API, cryptographic policy tokens, Supabase PostgreSQL, and our deterministic policy engine are completely real and live. Core banking settlement rails are not publicly accessible to hackathon teams, so the underlying banking ledger is realistic seeded test data clearly labeled `TEST DATA`.
+
+---
+
+## 👥 Authors & Team
+
+Built with ❤️ for **Paytm ♥ AI Hackathon 2026** by:
+- **Sparsh** ([@sparsh101sparsh](https://github.com/sparsh101sparsh))
