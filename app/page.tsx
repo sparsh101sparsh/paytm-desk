@@ -26,6 +26,7 @@ import {
   CreditCard,
   ShieldCheck,
   BarChart3,
+  ExternalLink,
 } from "lucide-react";
 import {
   MerchantDirectoryView,
@@ -818,10 +819,17 @@ export default function ResolveOS() {
             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${health?.sarvam === "live" ? "bg-emerald-400" : "bg-amber-400"}`} />
             <span className="hidden sm:inline font-medium">Sarvam</span>
           </div>
-          <div className="flex items-center gap-1.5 h-7 px-2 sm:px-2.5 rounded-[4px] bg-white/10 border border-white/15 shadow-sm" title="Meta WhatsApp Cloud API">
-            <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-emerald-400" />
-            <span className="hidden sm:inline font-medium">WhatsApp</span>
-          </div>
+          <a
+            href="https://wa.me/15552013457?text=Kal%20ka%2014000%20ka%20settlement%20nahi%20aaya"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 h-7 px-2 sm:px-2.5 rounded-[4px] bg-[#25D366] hover:bg-[#20bd5a] text-white font-medium shadow-sm transition border border-[#25D366]/40 group shrink-0"
+            title="Open Live WhatsApp Bot (+1 555 201-3457)"
+          >
+            <MessageSquare className="w-3.5 h-3.5 fill-white text-white shrink-0" />
+            <span className="font-semibold text-[11px] sm:text-xs tracking-tight">WhatsApp Bot</span>
+            <ExternalLink className="w-3 h-3 opacity-80 group-hover:opacity-100 transition shrink-0" />
+          </a>
         </div>
       </header>
 
@@ -1448,16 +1456,27 @@ export default function ResolveOS() {
                   The queue is live with zero seeded fake tickets. Send a real message to our WhatsApp business number.
                 </p>
               </div>
-              <div className="bg-white border border-[#E5E7EB] rounded-lg p-3.5 w-full text-left text-xs space-y-1.5 shadow-sm">
+              <a
+                href="https://wa.me/15552013457?text=Kal%20ka%2014000%20ka%20settlement%20nahi%20aaya"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-white hover:bg-slate-50 border border-[#E5E7EB] hover:border-[#25D366]/60 rounded-lg p-3.5 w-full text-left text-xs space-y-1.5 shadow-sm transition block group cursor-pointer"
+                title="Click to launch WhatsApp Chat"
+              >
                 <div className="flex items-center justify-between text-[10px] font-medium tracking-[0.06em] text-slate-400 uppercase">
                   <span>WHATSAPP SUPPORT CHANNEL</span>
-                  <span className="text-emerald-600 font-mono">CONNECTED</span>
+                  <span className="text-emerald-600 font-mono flex items-center gap-1">
+                    CONNECTED <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
+                  </span>
                 </div>
-                <div className="font-medium text-slate-800 text-sm font-mono">+1 (555) 201-3457</div>
+                <div className="font-medium text-slate-800 text-sm font-mono flex items-center gap-2">
+                  <span className="text-emerald-600 font-bold">+1 (555) 201-3457</span>
+                  <span className="text-[10px] font-sans font-medium px-2 py-0.5 rounded bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/30">Click to Open Bot</span>
+                </div>
                 <div className="text-[11px] text-slate-500">
                   Auto-handled by Sarvam 105B &middot; Deterministic Policy &middot; Live Ledger
                 </div>
-              </div>
+              </a>
             </div>
           )}
         </main>
