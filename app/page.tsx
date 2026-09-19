@@ -11,7 +11,6 @@ import {
   ChevronDown,
   Check,
   HelpCircle,
-  Send,
   X,
   Info,
   MessageSquare,
@@ -178,10 +177,6 @@ export default function ResolveOS() {
   const [customAmount, setCustomAmount] = useState<string>("200000");
   const [demoToolsOpen, setDemoToolsOpen] = useState<boolean>(false);
   const [showArchPopover, setShowArchPopover] = useState<boolean>(false);
-
-  // WhatsApp simulation composer
-  const [simText, setSimText] = useState<string>("");
-  const [simSending, setSimSending] = useState<boolean>(false);
 
   // Resizable Column Splitters State & Handlers
   const [queueWidth, setQueueWidth] = useState<number>(350);
@@ -609,60 +604,6 @@ export default function ResolveOS() {
     }
   };
 
-  const handleSimulateInbound = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!simText.trim() || simSending) return;
-    setSimSending(true);
-    try {
-      const res = await fetch(getApiUrl("/api/webhook/whatsapp"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          object: "whatsapp_business_account",
-          entry: [
-            {
-              id: "876439015402194",
-              changes: [
-                {
-                  value: {
-                    messaging_product: "whatsapp",
-                    metadata: { display_phone_number: "15552013457", phone_number_id: "1329851416876776" },
-                    contacts: [{ profile: { name: "Sparsh" }, wa_id: "919810012345" }],
-                    messages: [
-                      {
-                        from: "919810012345",
-                        id: `wamid.sim_${Date.now()}`,
-                        timestamp: String(Math.floor(Date.now() / 1000)),
-                        text: { body: simText.trim() },
-                        type: "text",
-                      },
-                    ],
-                  },
-                  field: "messages",
-                },
-              ],
-            },
-          ],
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSimText("");
-        await fetchTickets();
-        if (data.ticket_id) {
-          setSelectedId(data.ticket_id);
-          setActiveTab("whatsapp");
-          await fetchDetail(data.ticket_id);
-        }
-        showToast("success", `Inbound WhatsApp message processed → ${data.ticket_id}`);
-      }
-    } catch {
-      showToast("error", "Failed to send simulated inbound.");
-    } finally {
-      setSimSending(false);
-    }
-  };
-
   // ─── Stations ──────────────────────────────────────────────────────────────
 
   const understoodEv = events.find((e) => e.type === "UNDERSTOOD");
@@ -1016,7 +957,7 @@ export default function ResolveOS() {
               <div className="p-6 text-center text-xs text-slate-400 space-y-1.5 my-auto">
                 <div className="font-medium text-slate-600">No tickets in this queue</div>
                 <div className="text-[11px] text-slate-400">
-                  Send a message from WhatsApp or use the test sender below.
+                  Send a message to WhatsApp number +1 (555) 201-3457.
                 </div>
               </div>
             ) : (
@@ -1076,29 +1017,6 @@ export default function ResolveOS() {
                 );
               })
             )}
-          </div>
-
-          {/* Inbound Simulator */}
-          <div className="p-3 border-t border-[#E5E7EB] bg-slate-50 shrink-0">
-            <span className="text-[10px] font-medium tracking-[0.06em] text-[#6B7280] uppercase block mb-1.5">
-              Simulate Inbound WhatsApp
-            </span>
-            <form onSubmit={handleSimulateInbound} className="flex gap-1.5 items-center">
-              <input
-                type="text"
-                value={simText}
-                onChange={(e) => setSimText(e.target.value)}
-                placeholder="e.g. kal ka settlement 14280 nahi aaya"
-                className="flex-1 h-7 px-2.5 text-xs border border-slate-300 rounded-[4px] bg-white focus:outline-none focus:border-[#00BAF2]"
-              />
-              <button
-                type="submit"
-                disabled={simSending || !simText.trim()}
-                className="h-7 px-2.5 bg-[#002970] text-white rounded-[4px] text-xs font-medium hover:bg-[#001f56] disabled:opacity-50 flex items-center justify-center transition"
-              >
-                <Send className="w-3.5 h-3.5" />
-              </button>
-            </form>
           </div>
         </aside>
 
@@ -1368,7 +1286,7 @@ export default function ResolveOS() {
                   Awaiting Live Merchant Inquiries
                 </div>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  The queue is live with zero seeded fake tickets. Send a real message on WhatsApp or use the test sender on the left.
+                  The queue is live with zero seeded fake tickets. Send a real message to our WhatsApp business number.
                 </p>
               </div>
               <div className="bg-white border border-[#E5E7EB] rounded-lg p-3.5 w-full text-left text-xs space-y-1.5 shadow-sm">
