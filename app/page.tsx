@@ -1018,11 +1018,24 @@ export default function ResolveOS() {
           className="shrink-0 bg-white border-r border-[#E5E7EB] flex flex-col h-full overflow-hidden shadow-[2px_0_8px_-3px_rgba(0,41,112,0.04)] z-10"
         >
           {/* Header */}
-          <div className="p-3 border-b border-[#E5E7EB] flex items-center justify-between shrink-0">
-            <span className="font-medium text-[13px] text-[#002970]">Queue</span>
-            <span className="text-[11px] font-normal text-slate-500">
-              {filteredTickets.filter((t) => t.status === "OPEN").length} open &middot; {filteredTickets.length} total
-            </span>
+          <div className="p-2.5 px-3 border-b border-[#E5E7EB] flex items-center justify-between shrink-0 bg-white">
+            <div className="flex items-center gap-1.5">
+              <span className="font-medium text-[13px] text-[#002970]">Queue</span>
+              <span className="text-[11px] font-normal text-slate-500">
+                {filteredTickets.filter((t) => t.status === "OPEN").length} open &middot; {filteredTickets.length} total
+              </span>
+            </div>
+            <a
+              href="https://wa.me/15552013457?text=Kal%20ka%2014000%20ka%20settlement%20nahi%20aaya"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#25D366] hover:bg-[#20bd5a] text-white text-[11px] font-semibold shadow-xs transition shrink-0 cursor-pointer"
+              title="Open WhatsApp Bot (+1 555 201-3457)"
+            >
+              <MessageSquare className="w-3 h-3 fill-white text-white" />
+              <span>WhatsApp Bot</span>
+              <ExternalLink className="w-2.5 h-2.5" />
+            </a>
           </div>
 
           {/* Gliding Filter Tabs with Crisp Squaring & Proper Border */}
@@ -1277,10 +1290,18 @@ export default function ResolveOS() {
                       </span>
                     )}
                   </div>
-                  <span className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
-                    <span className="size-1.5 rounded-full bg-emerald-500" />
-                    WhatsApp &middot; {timeAgo(selectedTicket.created_at)}
-                  </span>
+                  <a
+                    href={`https://wa.me/15552013457?text=${encodeURIComponent(selectedTicket.text || "Kal ka 14000 ka settlement nahi aaya")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200/80 flex items-center gap-1 transition cursor-pointer"
+                    title="Open in WhatsApp"
+                  >
+                    <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>WhatsApp</span>
+                    <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                    <span className="text-slate-400">&middot; {timeAgo(selectedTicket.created_at)}</span>
+                  </a>
                 </div>
                 <div className="p-3.5 rounded-lg bg-slate-50/90 border-l-4 border-l-[#00BAF2] shadow-xs">
                   <p className="text-[13.5px] font-medium text-slate-800 leading-relaxed italic">
