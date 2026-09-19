@@ -143,12 +143,6 @@ export default function ResolveOS() {
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   const tabItemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
-  // Header Actions Gliding Indicator Tracking (NETRA Pattern)
-  const [hoveredHeaderBtn, setHoveredHeaderBtn] = useState<string | null>(null);
-  const [headerPillStyle, setHeaderPillStyle] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
-  const headerContainerRef = useRef<HTMLDivElement>(null);
-  const headerBtnRefs = useRef<Record<string, HTMLElement | null>>({});
-
   const [loading, setLoading] = useState<boolean>(true);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [elapsed, setElapsed] = useState<number>(0);
@@ -168,7 +162,7 @@ export default function ResolveOS() {
   const [simSending, setSimSending] = useState<boolean>(false);
 
   // Resizable Column Splitters State & Handlers
-  const [queueWidth, setQueueWidth] = useState<number>(290);
+  const [queueWidth, setQueueWidth] = useState<number>(350);
   const [forensicWidth, setForensicWidth] = useState<number>(340);
   const [isDraggingLeft, setIsDraggingLeft] = useState<boolean>(false);
   const [isDraggingRight, setIsDraggingRight] = useState<boolean>(false);
@@ -178,7 +172,11 @@ export default function ResolveOS() {
       const savedQueue = localStorage.getItem("ros_queue_width");
       if (savedQueue) {
         const parsed = parseInt(savedQueue, 10);
-        if (!isNaN(parsed)) setQueueWidth(Math.max(220, Math.min(460, parsed)));
+        if (!isNaN(parsed) && parsed >= 330) {
+          setQueueWidth(Math.max(280, Math.min(480, parsed)));
+        } else {
+          setQueueWidth(350);
+        }
       }
       const savedForensic = localStorage.getItem("ros_forensic_width");
       if (savedForensic) {
@@ -377,30 +375,6 @@ export default function ResolveOS() {
     window.addEventListener("resize", updateTabPosition);
     return () => window.removeEventListener("resize", updateTabPosition);
   }, [hoveredTab, activeTab, queueWidth]);
-
-  // Reposition Header Action Gliding Pill
-  useLayoutEffect(() => {
-    const updateHeaderPosition = () => {
-      if (!hoveredHeaderBtn) return;
-      const targetElement = headerBtnRefs.current[hoveredHeaderBtn];
-      const container = headerContainerRef.current;
-
-      if (targetElement && container) {
-        const targetRect = targetElement.getBoundingClientRect();
-        const containerRect = container.getBoundingClientRect();
-        const left = targetRect.left - containerRect.left;
-        const top = targetRect.top - containerRect.top;
-        const width = targetRect.width;
-        const height = targetRect.height;
-
-        setHeaderPillStyle({ left, top, width, height });
-      }
-    };
-
-    updateHeaderPosition();
-    window.addEventListener("resize", updateHeaderPosition);
-    return () => window.removeEventListener("resize", updateHeaderPosition);
-  }, [hoveredHeaderBtn]);
 
   // ─── Filtered Tickets & Active Entities ────────────────────────────────────
   const heroIds = ["T-1042", "T-1048", "T-1055"];
@@ -736,66 +710,19 @@ export default function ResolveOS() {
           <span className="text-white/70 text-xs font-normal">Merchant Support</span>
         </div>
 
-        {/* Right: Header Controls with NETRA Gliding Highlight */}
-        <div className="flex items-center gap-3">
-          <div
-            ref={headerContainerRef}
-            onMouseLeave={() => setHoveredHeaderBtn(null)}
-            className="relative flex items-center p-0.5 rounded-md bg-white/10 border border-white/20 overflow-hidden shadow-sm"
-          >
-            {/* Sliding Pill Indicator for Header Controls with Crisp Squaring & Clean Border */}
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute z-0 rounded-[4px] bg-white/20 border border-white/25 shadow-sm transition-all"
-              style={{
-                left: headerPillStyle?.left ?? 0,
-                top: headerPillStyle?.top ?? 0,
-                width: headerPillStyle?.width ?? 0,
-                height: headerPillStyle?.height ?? 0,
-                opacity: headerPillStyle && hoveredHeaderBtn ? 1 : 0,
-                transition:
-                  "left 200ms cubic-bezier(0.23, 1, 0.32, 1), width 200ms cubic-bezier(0.23, 1, 0.32, 1), opacity 150ms ease",
-              }}
-            />
-
-            <button
-              ref={(el) => { headerBtnRefs.current["reset"] = el; }}
-              onMouseEnter={() => setHoveredHeaderBtn("reset")}
-              onClick={handleReset}
-              className="relative z-10 h-7 px-2.5 flex items-center gap-1.5 text-xs font-medium text-white/90 hover:text-white rounded-[4px] transition-colors focus-visible:outline-none"
-              title="Clear tickets and reset test ledger"
-            >
-              <RotateCcw className="w-3 h-3 text-[#00BAF2]" />
-              <span>Reset demo</span>
-            </button>
-
-            <button
-              ref={(el) => { headerBtnRefs.current["arch"] = el; }}
-              onMouseEnter={() => setHoveredHeaderBtn("arch")}
-              onClick={() => setShowArchPopover(!showArchPopover)}
-              className="relative z-10 h-7 w-7 flex items-center justify-center text-white/80 hover:text-white rounded-[4px] transition-colors focus-visible:outline-none"
-              title="Architecture Flowchart"
-            >
-              <HelpCircle className="w-3.5 h-3.5" />
-            </button>
+        {/* Right: Telemetry Health Badges */}
+        <div className="flex items-center gap-2 text-[11px] text-white/90 font-normal">
+          <div className="flex items-center gap-1.5 h-7 px-2.5 rounded-[4px] bg-white/10 border border-white/15 shadow-sm" title="SQLite Database">
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${apiError ? "bg-red-400" : "bg-emerald-400"}`} />
+            <span className="hidden sm:inline font-medium">API</span>
           </div>
-
-          <div className="h-4 w-px bg-white/20 shrink-0" />
-
-          {/* Health status badges with crisp squaring & borders */}
-          <div className="flex items-center gap-2 text-[11px] text-white/80 font-normal">
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/10 border border-white/15 shadow-sm" title="SQLite Database">
-              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${apiError ? "bg-red-400" : "bg-emerald-400"}`} />
-              <span className="hidden sm:inline">API</span>
-            </div>
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/10 border border-white/15 shadow-sm" title={health?.sarvam === "live" ? "Sarvam 105B Live" : "Sarvam Fixture"}>
-              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${health?.sarvam === "live" ? "bg-emerald-400" : "bg-amber-400"}`} />
-              <span className="hidden sm:inline">Sarvam</span>
-            </div>
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/10 border border-white/15 shadow-sm" title="Meta WhatsApp Cloud API">
-              <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-emerald-400" />
-              <span className="hidden sm:inline">WhatsApp</span>
-            </div>
+          <div className="flex items-center gap-1.5 h-7 px-2.5 rounded-[4px] bg-white/10 border border-white/15 shadow-sm" title={health?.sarvam === "live" ? "Sarvam 105B Live" : "Sarvam Fixture"}>
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${health?.sarvam === "live" ? "bg-emerald-400" : "bg-amber-400"}`} />
+            <span className="hidden sm:inline font-medium">Sarvam</span>
+          </div>
+          <div className="flex items-center gap-1.5 h-7 px-2.5 rounded-[4px] bg-white/10 border border-white/15 shadow-sm" title="Meta WhatsApp Cloud API">
+            <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-emerald-400" />
+            <span className="hidden sm:inline font-medium">WhatsApp</span>
           </div>
         </div>
       </header>
@@ -996,13 +923,13 @@ export default function ResolveOS() {
             <div
               ref={tabsContainerRef}
               onMouseLeave={() => setHoveredTab(null)}
-              className="relative flex items-center p-0.5 rounded-md bg-slate-200/70 border border-slate-300/80 text-xs font-medium select-none overflow-hidden shadow-inner"
+              className="relative flex items-center p-1 rounded-lg bg-slate-200/70 border border-slate-300/80 text-xs font-medium select-none overflow-hidden shadow-inner h-9"
               aria-label="Queue Filter Tabs"
             >
               {/* The Gliding Indicator Pill with Crisp Squaring & Proper Border */}
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute z-0 rounded-[4px] bg-[#002970] border border-[#001f56] shadow-sm transition-all"
+                className="pointer-events-none absolute z-0 rounded-[5px] bg-[#002970] border border-[#001f56] shadow-sm transition-all"
                 style={{
                   left: tabPillStyle?.left ?? 0,
                   top: tabPillStyle?.top ?? 0,
@@ -1025,16 +952,16 @@ export default function ResolveOS() {
                     type="button"
                     onClick={() => setActiveTab(tab.id)}
                     onMouseEnter={() => setHoveredTab(tab.id)}
-                    className={`relative z-10 flex-1 h-7 text-center text-xs font-medium rounded-[4px] transition-colors duration-150 flex items-center justify-center gap-1.5 focus-visible:outline-none cursor-pointer ${
+                    className={`relative z-10 flex-1 h-7 whitespace-nowrap text-center text-xs font-medium rounded-[5px] transition-colors duration-150 flex items-center justify-center gap-1.5 px-2 focus-visible:outline-none cursor-pointer ${
                       hasPill ? "text-white font-medium" : "text-slate-600 hover:text-slate-900"
                     }`}
                   >
                     {isActive && (
                       <span className="size-1.5 rounded-full bg-[#00BAF2] animate-pulse shrink-0" />
                     )}
-                    <span>{tab.label}</span>
+                    <span className="whitespace-nowrap">{tab.label}</span>
                     <span
-                      className={`px-1.5 py-0.5 rounded-[3px] text-[10px] font-semibold tabular-nums leading-none transition-colors ${
+                      className={`shrink-0 px-1.5 py-0.5 rounded-[3px] text-[10px] font-semibold tabular-nums leading-none transition-colors ${
                         hasPill ? "bg-white/20 text-white" : "bg-slate-300/60 text-slate-600"
                       }`}
                     >
@@ -1657,6 +1584,25 @@ export default function ResolveOS() {
                 >
                   Reset Active Merchant
                 </button>
+
+                <div className="pt-2 border-t border-slate-200/80 flex flex-col gap-1.5">
+                  <button
+                    onClick={handleReset}
+                    className="w-full h-7 px-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-[4px] text-xs font-medium transition flex items-center justify-center gap-1.5 shadow-xs"
+                    title="Clear tickets and reset test ledger"
+                  >
+                    <RotateCcw className="w-3 h-3 text-[#002970]" />
+                    <span>Reset Demo State &amp; Ledger</span>
+                  </button>
+                  <button
+                    onClick={() => setShowArchPopover(true)}
+                    className="w-full h-7 px-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-[4px] text-xs font-medium transition flex items-center justify-center gap-1.5 shadow-xs"
+                    title="View Architecture Flowchart"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5 text-[#002970]" />
+                    <span>Architecture Flowchart</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
