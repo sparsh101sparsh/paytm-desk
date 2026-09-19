@@ -136,6 +136,8 @@ def send_meta_whatsapp_message(to_phone: str, message_body: str) -> bool:
         "Content-Type": "application/json"
     }
     clean_to = "".join(filter(str.isdigit, to_phone))
+    if len(clean_to) == 10:
+        clean_to = f"91{clean_to}"
     payload = {
         "messaging_product": "whatsapp",
         "to": clean_to,

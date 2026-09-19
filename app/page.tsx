@@ -291,6 +291,14 @@ export default function ResolveOS() {
         if (isInitialLoadRef.current) {
           isInitialLoadRef.current = false;
           knownTicketIdsRef.current = new Set(data.map((t) => t.id));
+          const hasLiveWa = data.some((t) => t.id.startsWith("T-WA"));
+          if (hasLiveWa) {
+            setActiveTab("whatsapp");
+            const latestWa = data.find((t) => t.id.startsWith("T-WA"));
+            if (latestWa) setSelectedId(latestWa.id);
+          } else {
+            setActiveTab("hero");
+          }
         } else {
           // Find any newly arrived WhatsApp ticket
           const newWaTicket = data.find(
@@ -298,8 +306,8 @@ export default function ResolveOS() {
           );
           if (newWaTicket) {
             setSelectedId(newWaTicket.id);
-            setActiveTab((prev) => (prev === "hero" ? "whatsapp" : prev));
-            showToast("info", `New WhatsApp message: ${getTicketContact(newWaTicket)}`);
+            setActiveTab("whatsapp");
+            showToast("info", `New WhatsApp message from ${getTicketContact(newWaTicket)}`);
           }
           knownTicketIdsRef.current = new Set(data.map((t) => t.id));
         }
@@ -399,16 +407,14 @@ export default function ResolveOS() {
   }, [hoveredTab, activeTab, queueWidth]);
 
   // ─── Filtered Tickets & Active Entities ────────────────────────────────────
-  const heroIds = ["T-1042", "T-1048", "T-1055"];
+  const heroIds = ["T-1042", "T-1048", "T-1055", "T-1061", "T-1067"];
 
   const filteredTickets = useMemo(() => {
     if (activeTab === "hero") {
       return tickets.filter((t) => heroIds.includes(t.id));
     }
     if (activeTab === "whatsapp") {
-      return tickets.filter(
-        (t) => t.id.startsWith("T-WA") || (t.channel === "WhatsApp" && !heroIds.includes(t.id))
-      );
+      return tickets.filter((t) => t.id.startsWith("T-WA"));
     }
     return tickets;
   }, [tickets, activeTab]);
@@ -645,7 +651,7 @@ export default function ResolveOS() {
         await fetchTickets();
         if (data.ticket_id) {
           setSelectedId(data.ticket_id);
-          setActiveTab("all");
+          setActiveTab("whatsapp");
           await fetchDetail(data.ticket_id);
         }
         showToast("success", `Inbound WhatsApp message processed → ${data.ticket_id}`);

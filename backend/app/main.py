@@ -743,10 +743,20 @@ async def receive_meta_whatsapp(request: Request, background_tasks: BackgroundTa
     msg_type = msg.get("type", "")
     msg_id = msg.get("id")
 
-    if msg_type != "text":
-        return {"status": "ignored_non_text"}
+    sender_text = ""
+    if msg_type == "text":
+        sender_text = msg.get("text", {}).get("body", "").strip()
+    elif msg_type == "image":
+        caption = msg.get("image", {}).get("caption", "").strip()
+        sender_text = f"[Image] {caption}".strip() if caption else "Merchant sent a photo of Soundbox / QR standee"
+    elif msg_type == "audio":
+        sender_text = "Merchant sent a voice note regarding support"
+    elif msg_type == "document":
+        filename = msg.get("document", {}).get("filename", "document")
+        sender_text = f"Merchant shared document: {filename}"
+    else:
+        sender_text = f"Merchant sent message of type: {msg_type}"
 
-    sender_text = msg.get("text", {}).get("body", "").strip()
     if not sender_text:
         return {"status": "empty_body"}
 
@@ -774,7 +784,7 @@ async def receive_meta_whatsapp(request: Request, background_tasks: BackgroundTa
             cur.execute("INSERT OR IGNORE INTO processed_messages (msg_id, created_at) VALUES (?, ?)", (msg_id, now_iso()))
         conn.commit()
 
-    # 2. Greeting / Menu short-circuit: reply immediately without creating a ticket
+    # 2. Greeting short-circuit: reply immediately without creating a ticket
     greeting_words = {
         "hello", "hi", "hey", "namaste", "pranam", "kaise", "ho", "aap", "ji",
         "kya", "haal", "h", "bhai", "sir", "madam", "menu", "start",
@@ -784,10 +794,13 @@ async def receive_meta_whatsapp(request: Request, background_tasks: BackgroundTa
     words = [w for w in clean_text.split() if w]
     is_greeting = (
         clean_text in greeting_words or
-        (words and all(w in greeting_words for w in words)) or
-        clean_text.isdigit()
+        (bool(words) and all(w in greeting_words for w in words))
     )
-    complaint_signals = ["settle", "payment", "rupaye", "rupees", "rs", "paisa", "refund", "qr", "soundbox", "kat gaya", "aaya", "phasa", "atack", "pending"]
+    complaint_signals = [
+        "settle", "payment", "rupaye", "rupees", "rs", "paisa", "refund", "qr",
+        "soundbox", "kat gaya", "aaya", "phasa", "atack", "pending", "help",
+        "madad", "issue", "problem", "dikkat", "kharab"
+    ]
 
     if is_greeting and not any(k in text_lower for k in complaint_signals):
         greeting_text = (
@@ -865,8 +878,11 @@ async def receive_meta_whatsapp(request: Request, background_tasks: BackgroundTa
     conn.commit()
     conn.close()
 
-    # 4. Dispatch autonomous Resolve OS run via BackgroundTasks (Fast 200 to Meta)
-    background_tasks.add_task(run_desk, ticket_id=ticket_id, request=None, recipient_phone=clean_phone)
+    # 3. Execute autonomous Resolve OS policy pipeline synchronously (reliable on serverless)
+    try:
+        run_desk(ticket_id=ticket_id, request=None, recipient_phone=clean_phone)
+    except Exception as e:
+        print(f"[Resolve OS Webhook Execution Error] {ticket_id}: {e}")
 
     return {
         "status": "success",
