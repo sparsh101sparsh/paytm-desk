@@ -77,15 +77,25 @@ def evaluate_policy(plan: SarvamPlan, db_state: Dict[str, Any]) -> PolicyDecisio
         )
 
     if plan.intent == "DEVICE_ISSUE":
-        token = generate_policy_token(ticket_id, "escalate_device", "ESCALATE_DEVICE_OPS")
+        devices = db_state.get("devices", [])
+        device = next((d for d in devices if d.get("merchant_id") == merchant.get("id")), None)
+        status = device.get("status") if device else "UNKNOWN"
+        is_offline = status == "OFFLINE"
+        code = "ESCALATE_DEVICE_OFFLINE" if is_offline else "ESCALATE_DEVICE_OPS"
+        token = generate_policy_token(ticket_id, "escalate_device", code)
+        explanation = (
+            f"Soundbox device is confirmed OFFLINE in hardware registry. Escalating to Field Ops for physical replacement."
+            if is_offline else
+            f"Soundbox device is {status} in hardware registry. Audio/announcement fault escalated to Device Ops."
+        )
         return PolicyDecision(
             allowed=False,
             action="escalate_device",
-            reason_code="ESCALATE_DEVICE_OPS",
+            reason_code=code,
             policy_token=token,
-            explanation="Soundbox / speaker device issue requires field operations. No money movement.",
+            explanation=explanation,
             next_ticket_status="ESCALATED",
-            args={"merchant_id": merchant.get("id")}
+            args={"merchant_id": merchant.get("id"), "device_id": device.get("id") if device else None, "device_status": status}
         )
 
     # 1. Check merchant level risk flags or memory risk flags

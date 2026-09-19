@@ -10,8 +10,10 @@ __pycache__/
 *.log
 
 # Database
-# Note: Keep desk.db untracked or tracked if preferred, but seed creates it dynamically
+*.db
 *.db-journal
+*.sqlite
+backend/desk.db
 .vercel
 
 # Secrets — never commit API keys

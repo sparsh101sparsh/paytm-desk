@@ -81,11 +81,11 @@ flowchart TD
     end
 
     subgraph STAGE4 ["6. Verified Tool Execution"]
-        ALLOW_RETRY --> T_RETRY[execute_retry_settlement_file\nUpdate status to SUCCESS + Assign UTR]
+        ALLOW_RETRY --> T_RETRY[execute_retry_settlement_file\nUpdate status to RETRY_REQUESTED]
         ALLOW_RETRY --> T_TICKET[execute_update_ticket\nStatus: RESOLVED]
         ESC_RISK --> T_BRIEF[execute_assign_human\nSynthesize 6-Line Ops Brief]
         ESC_RISK --> T_TICKET_ESC[execute_update_ticket\nStatus: ESCALATED]
-        T_RETRY --> AUDIT_LOG[(SQLite audit_events\nActor: POLICY, BACKEND, SARVAM)]
+        T_RETRY --> AUDIT_LOG[(Supabase Postgres 17 / SQLite audit_events\nActor: POLICY_ENGINE, OPERATOR, SARVAM_AI)]
         T_BRIEF --> AUDIT_LOG
     end
 
@@ -116,8 +116,8 @@ flowchart TD
 | **Sarvam AI (`sarvam-105b`)** | Hinglish comprehension and structured action plan proposals | ✅ **Live API** (`https://api.sarvam.ai/v1/chat/completions`) |
 | **Deterministic Policy Engine** | Non-LLM mathematical and boolean rule engine enforcing financial limits | ✅ **Real code + 100% test coverage** |
 | **Meta WhatsApp Cloud API** | Inbound merchant messaging webhook & outbound templated notifications | ✅ **Live on Sandbox phone `+1 555-201-3457`** |
-| **FastAPI Backend & Tools** | Executes approved actions, generates cryptographic policy tokens | ✅ **Live local & Vercel runtime** |
-| **Merchant History & Audit Ledger** | Real-time dispute history and previous action tracking in SQLite | ✅ **Live SQLite database** |
+| **FastAPI Backend & Tools** | Executes approved actions, generates cryptographic policy tokens | ✅ **Live on Vercel Serverless runtime** |
+| **Merchant History & Audit Ledger** | Real-time dispute history and previous action tracking | ✅ **Live Supabase PostgreSQL 17 (ap-south-1 Mumbai) + SQLite fallback** |
 | **Paytm Core Ledger** | Settlements, transactions, merchants, and devices tables | ✅ **Seeded realistic test data** (labeled TEST DATA) |
 
 > **The Honest Line:** Sarvam 105b, Meta WhatsApp Cloud API, and our deterministic policy engine are completely real and live. Paytm core banking APIs are not publicly accessible to hackathon teams, so the ledger is realistic test data labeled TEST DATA.

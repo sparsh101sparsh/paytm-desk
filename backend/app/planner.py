@@ -122,9 +122,10 @@ Current Transactions in DB: {json.dumps(transactions)}
         )
         return plan, "FIXTURE", 35
 
-    # Case 1: Greeting / Conversational query
-    greeting_words = ["hello", "hi", "hey", "namaste", "kaise", "haal", "shukriya", "thanks", "who are you", "kya kar", "help", "madad"]
-    if any(g in text_lower for g in greeting_words) and not any(k in text_lower for k in ["settlement", "refund", "wapas", "freeze", "aml"]):
+    # Case 1: Greeting / Conversational query (strictly non-complaint greetings)
+    greeting_words = ["hello", "hi", "hey", "namaste", "pranam", "kaise ho", "kya haal", "shukriya", "thanks", "who are you"]
+    complaint_cues = ["settlement", "refund", "wapas", "freeze", "aml", "payment", "paisa", "rupaye", "rs", "qr", "soundbox", "ruka", "phasa", "fail", "kat gaya"]
+    if any(g in text_lower for g in greeting_words) and not any(k in text_lower for k in complaint_cues):
         plan = SarvamPlan(
             intent="GREETING",
             confidence=0.98,
@@ -180,8 +181,11 @@ Current Transactions in DB: {json.dumps(transactions)}
         )
         return plan, "FIXTURE", 78
 
-    # Case 5: Settlement issue
-    if any(w in text_lower for w in ["settlement", "paisa", "rupaye", "credit", "aaya"]) or (settlements and any(w in text_lower for w in ["bank", "utr", "pending", "kal", "aaj"])):
+    # Case 5: Settlement issue (requires explicit settlement or payment + missing indicators)
+    has_money_signal = any(w in text_lower for w in ["settlement", "paisa", "rupaye", "payment", "rupees", "rs", "credit", "amount"])
+    has_missing_signal = any(w in text_lower for w in ["nahi aaya", "ruka", "phasa", "atack", "pending", "fail", "missing", "kat gaya", "clear karo", "aaya"])
+    is_explicit_settlement = "settlement" in text_lower or (has_money_signal and has_missing_signal)
+    if is_explicit_settlement:
         # Check if settlement is failed or account frozen
         if settlements and (settlements[0].get("status") == "FAILED" or "FROZEN" in (settlements[0].get("reason") or "")):
             batch = settlements[0]

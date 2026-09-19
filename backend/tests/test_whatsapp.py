@@ -182,12 +182,11 @@ def test_meta_whatsapp_payment_not_received_hinglish():
     assert t is not None
     assert t["status"] == "RESOLVED"
 
-    # Verify settlement batch amount was updated to ₹12,000 and status is SUCCESS
-    cur.execute("SELECT amount, status, utr FROM settlements WHERE merchant_id = 'm_me' AND amount = 12000.0")
+    # Verify settlement batch status is RETRY_REQUESTED
+    cur.execute("SELECT amount, status, utr FROM settlements WHERE merchant_id = 'm_me' ORDER BY created_at DESC LIMIT 1")
     settlement = cur.fetchone()
     assert settlement is not None
-    assert settlement["status"] == "SUCCESS"
-    assert settlement["utr"] is not None
+    assert settlement["status"] == "RETRY_REQUESTED"
     conn.close()
 
 
